@@ -1,0 +1,31 @@
+{
+  "name": "permacast-protocol",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Specifications and architecture of Permacast protocol",
+  "main": "index.js",
+  "scripts": {
+    "local-test": "node ./src/local-testing/contract.tests.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parallel-news/permacast-protocol.git"
+  },
+  "keywords": [
+    "permacast",
+    "podcasts",
+    "web3",
+    "ethereum",
+    "arweave"
+  ],
+  "author": "charmful0x",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/parallel-news/permacast-protocol/issues"
+  },
+  "homepage": "https://github.com/parallel-news/permacast-protocol#readme",
+  "dependencies": {
+    "@execution-machine/sdk": "^0.1.5",
+    "fs": "^0.0.1-security"
+  }
+}
