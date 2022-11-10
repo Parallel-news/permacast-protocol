@@ -26,7 +26,7 @@ Then you can add and test all of the contract's functions locally from [src/loca
 Permacast's state (testnet and mainnet) is relatively related to the technical protocol stage.
 
 | Feature/Specification  | Amber | Bloodstone |
-| ------------- |:-------------:| ------------- |
+| ------------- |:-------------:| :-------------: |
 | Smart Contract Protocol     | [SmartWeave](https://github.com/ArweaveTeam/SmartWeave)  |  [EXM](https://exm.dev) |
 | Storage Payment Token |  Arweave (AR) | multi-token via [Bundlr](https://bundlr.network) |
 | Episode Tokenization      | [aNFT (Atomic NFT)](https://atomicnft.com/en/)     |  [NEP-171](https://github.com/near/NEPs/discussions/171) |
