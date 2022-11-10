@@ -238,10 +238,8 @@ export async function handle(state, action) {
       ERROR_INVALID_CALLER
     );
 
-    // episode's description is extracted from the
-    // interaction's TX body data.
-    _validateStringTypeLen(description, EP_DESC_LIMITS.min, EP_DESC_LIMITS.max);
 
+    _validateStringTypeLen(description, EP_DESC_LIMITS.min, EP_DESC_LIMITS.max);
     _validateStringTypeLen(name, EP_NAME_LIMITS.min, EP_NAME_LIMITS.max);
     _validateStringTypeLen(content, 43, 43);
     _validateStringTypeLen(pid, PID_LIMITS.min, PID_LIMITS.max);
@@ -326,7 +324,7 @@ export async function handle(state, action) {
      *
      **/
     const pid = input.pid;
-    const address = input.address; // jwk_n of the address
+    const address = input.address;
     const jwk_n = input.jwk_n;
     const sig = input.sig;
 
@@ -1004,6 +1002,10 @@ export async function handle(state, action) {
 
   async function _verifyArSignature(owner, signature) {
     try {
+      ContractAssert(
+        !state.signatures.includes(signature),
+        ERROR_SIGNATURE_ALREADY_USED
+      );
       const sigBody = state.user_sig_messages;
       const encodedMessage = new TextEncoder().encode(
         `${sigBody[sigBody.length - 1]}${owner}`
@@ -1018,10 +1020,7 @@ export async function handle(state, action) {
       );
 
       ContractAssert(isValid, ERROR_INVALID_CALLER_SIGNATURE);
-      ContractAssert(
-        !state.signatures.includes(signature),
-        ERROR_SIGNATURE_ALREADY_USED
-      );
+      
       state.signatures.push(signature);
     } catch (error) {
       throw new ContractError(ERROR_INVALID_CALLER_SIGNATURE);
@@ -1030,8 +1029,11 @@ export async function handle(state, action) {
 
   async function _verifyAdminArSignature(owner, signature) {
     try {
-      // verify that the message has been signed by `caller`
       ContractAssert(state.admins.includes(owner), ERROR_INVALID_CALLER);
+      ContractAssert(
+        !admins_signatures.includes(signature),
+        ERROR_SIGNATURE_ALREADY_USED
+      );
       
       const sigBody = state.admin_sig_messages;
       const encodedMessage = new TextEncoder().encode(
@@ -1047,10 +1049,6 @@ export async function handle(state, action) {
       );
 
       ContractAssert(isValid, ERROR_INVALID_CALLER_SIGNATURE);
-      ContractAssert(
-        !admins_signatures.includes(signature),
-        ERROR_SIGNATURE_ALREADY_USED
-      );
       admins_signatures.push(signature);
     } catch (error) {
       throw new ContractError(ERROR_INVALID_CALLER_SIGNATURE);
