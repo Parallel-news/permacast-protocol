@@ -1031,6 +1031,8 @@ export async function handle(state, action) {
   async function _verifyAdminArSignature(owner, signature) {
     try {
       // verify that the message has been signed by `caller`
+      ContractAssert(state.admins.includes(owner), ERROR_INVALID_CALLER);
+      
       const sigBody = state.admin_sig_messages;
       const encodedMessage = new TextEncoder().encode(
         `${sigBody[sigBody.length - 1]}${owner}`
