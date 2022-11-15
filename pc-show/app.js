@@ -14,7 +14,11 @@ app.use(
 
 app.get("/", async (req, res) => {
   const label = await getSubdomain(req);
-  console.log(label);
+  if (!label || label === "pc-show") {
+
+    res.redirect(`https://permacast.dev`);
+    return;    
+  }
   const pid = await nameToPid(label);
   console.log(pid);
   if (pid) {
