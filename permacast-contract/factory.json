@@ -41,10 +41,6 @@
     "episode_desc_len": {
       "min": 1,
       "max": 5000
-    },
-    "pid": {
-      "min": 128,
-      "max": 128
     }
   }
 }
