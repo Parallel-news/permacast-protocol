@@ -245,7 +245,6 @@ export async function handle(state, action) {
     _validateStringTypeLen(description, EP_DESC_LIMITS.min, EP_DESC_LIMITS.max);
     _validateStringTypeLen(name, EP_NAME_LIMITS.min, EP_NAME_LIMITS.max);
     _validateStringTypeLen(content, 43, 43);
-    _validateStringTypeLen(pid, PID_LIMITS.min, PID_LIMITS.max);
 
     const podcastContentType = podcasts[pidIndex]["contentType"];
 
@@ -655,7 +654,6 @@ export async function handle(state, action) {
     const authorName = input.authorName;
     const podcastDesc = input.podcastDesc;
     const episodeDesc = input.episodeDesc;
-    const pid = input.pid;
 
     const jwk_n = input.jwk_n;
     const sig = input.sig;
@@ -690,12 +688,6 @@ export async function handle(state, action) {
       const minMax = _validateAndReturnLimits(authorName);
       AUTHOR_NAME_LIMITS.min = minMax[0];
       AUTHOR_NAME_LIMITS.max = minMax[1];
-    }
-
-    if (pid) {
-      const minMax = _validateAndReturnLimits(pid);
-      PID_LIMITS.min = minMax[0];
-      PID_LIMITS.max = minMax[1];
     }
 
     return { state };
