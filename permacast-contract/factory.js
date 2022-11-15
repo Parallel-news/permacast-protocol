@@ -88,6 +88,7 @@ export async function handle(state, action) {
   const ERROR_REENTRANCY_FEE = `ERROR_PODCAST_CREATION_FEE_ALREADY_USED`;
   const ERROR_INVALID_PAYMENT = `ERROR_PAYMENT_TX_DROPPED_OR_PENDING_UNDERPAID`;
   const ERROR_CONTRACT_PAUSED = `ERROR_CANNOT_INVOKE_FUNCTION_WHILE_CONTRACT_IS_PAUSED`;
+  const ERROR_LABEL_IN_USE = `ERROR_PODCAST_LABEL_IS_USED`;
 
   if (input.function === "createPodcast") {
     /**
@@ -118,6 +119,7 @@ export async function handle(state, action) {
      **/
 
     const name = input.name;
+    const label = input.label;
     const description = input.desc;
     const author = input.author;
     const lang = input.lang;
@@ -134,7 +136,7 @@ export async function handle(state, action) {
     const txid = input.txid;
 
     let maintainersArray = [];
-
+    const validatedLabel = _validateLabel(label);
     const contentType = input.contentType === "a" ? "audio/" : "video/";
     _notPaused();
     _validateOwnerSyntax(jwk_n);
@@ -179,6 +181,7 @@ export async function handle(state, action) {
 
     podcasts.push({
       pid: pid,
+      label: validatedLabel,
       contentType: contentType,
       createdAt: EXM.getDate().getTime(),
       index: _getPodcastIndex(), // id equals the index of the podacast obj in the podcasts array
@@ -378,6 +381,7 @@ export async function handle(state, action) {
     const cover = input.cover;
     const isVisible = input.isVisible;
     let categories = input.categories;
+    const label = input.label;
     const jwk_n = input.jwk_n;
     const sig = input.sig;
 
@@ -449,6 +453,10 @@ export async function handle(state, action) {
         ERROR_INVALID_PRIMITIVE_TYPE
       );
       podcast["isVisible"] = isVisible;
+    }
+
+    if (label) {
+      podcast["label"] = _validateLabel(label);
     }
 
     return { state };
@@ -1093,6 +1101,18 @@ export async function handle(state, action) {
     } catch (error) {
       throw new ContractError(ERROR_INVALID_PAYMENT);
     }
+  }
+
+  function _validateLabel(label) {
+    if (!label) {
+      return null
+    };
+
+    _validateStringTypeLen(label, 1, 35);
+    const existingLabels = podcasts.map((pod) => pod.label && !!pod.label); // only valid labels
+    ContractAssert(!existingLabels.includes(label), ERROR_LABEL_IN_USE);
+    ContractAssert(/^(?!-)[a-zA-Z0-9-]{1,35}(?<!-)$/.test(label));
+    return label;
   }
 
   function _notPaused() {
