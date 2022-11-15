@@ -5,6 +5,7 @@
   "description": "Specifications and architecture of Permacast protocol",
   "main": "index.js",
   "scripts": {
+    "start": "node ./pc-show/app.js",
     "local-test": "node ./src/local-testing/contract.tests.js"
   },
   "repository": {
@@ -26,6 +27,8 @@
   "homepage": "https://github.com/parallel-news/permacast-protocol#readme",
   "dependencies": {
     "@execution-machine/sdk": "^0.1.5",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
     "fs": "^0.0.1-security"
   }
 }
