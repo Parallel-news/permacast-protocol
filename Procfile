@@ -1,0 +1,1 @@
+web: node ./pc-show/app.js
