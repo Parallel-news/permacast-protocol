@@ -19,7 +19,7 @@ export async function nameToPid(name) {
       await axios.get(`https://api.exm.dev/read/${PERMACAST_CONTRACT_ID}`)
     )?.data;
     const pid = permacastState?.podcasts?.find(
-      (pod) => pod?.label && !!pod?.label
+      (pod) => pod?.label === name
     )?.pid;
     assert.equal(!!pid, true);
     return pid;
