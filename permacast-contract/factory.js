@@ -89,6 +89,11 @@ export async function handle(state, action) {
   const ERROR_INVALID_PAYMENT = `ERROR_PAYMENT_TX_DROPPED_OR_PENDING_UNDERPAID`;
   const ERROR_CONTRACT_PAUSED = `ERROR_CANNOT_INVOKE_FUNCTION_WHILE_CONTRACT_IS_PAUSED`;
   const ERROR_LABEL_IN_USE = `ERROR_PODCAST_LABEL_IS_USED`;
+  const ERROR_MOLECULE_SERVER_ERROR = `ERROR_UNEXPECTED_ERROR_FROM_MOLECULE`;
+  const ERROR_NO_CATEGORY_PROVIDED = `ERROR_MUST_PROVIDE_CATEGORY_TO_UPDATE`;
+  const ERROR_INVALID_DATA_SIZE_TX = `ERROR_EMPTY_DATA_TRANSACTION`; 
+  const ERROR_PARSING_TX_METADATA = `ERROR_GETTING_TX_METADATA`;
+
 
   if (input.function === "createPodcast") {
     /**
@@ -143,7 +148,12 @@ export async function handle(state, action) {
     await _verifyArSignature(jwk_n, sig);
     await _validatePayment(master_network, network, token, txid);
 
+    const coverTxObject = await _getTxObject(cover);
+    const coverTxMetadata = _getTxMetadata(coverTxObject);
+
     const pid = SmartWeave.transaction.id;
+
+    ContractAssert(coverTxMetadata?.contentType?.startsWith(`image/`), ERROR_MIME_TYPE);
 
     _validateStringTypeLen(
       description,
@@ -213,7 +223,6 @@ export async function handle(state, action) {
      * @param name episode name
      * @param content episode audio's or video's Arweave TXID
      * @param desc the episode's description
-     * @param mimetype the Content-Type of episode's content
      * @param jwk_n the public key of the caller
      * @param sig a message signed by the caller's public key
      *
@@ -224,13 +233,14 @@ export async function handle(state, action) {
     const name = input.name;
     const description = input.desc;
     const content = input.content;
-    const mimeType = input.mimeType; // !!MUST VALIDATED SOMEHOW BY ADMIN!!
     const jwk_n = input.jwk_n;
     const sig = input.sig;
 
     _validateOwnerSyntax(jwk_n);
     _notPaused();
     await _verifyArSignature(jwk_n, sig);
+    const contentTxObject = await _getTxObject(content);
+    const contentTxMetadata = _getTxMetadata(contentTxObject);
 
     const eid = SmartWeave.transaction.id;
     const pidIndex = _getAndValidatePidIndex(pid);
@@ -248,13 +258,14 @@ export async function handle(state, action) {
 
     const podcastContentType = podcasts[pidIndex]["contentType"];
 
-    ContractAssert(mimeType.startsWith(podcastContentType), ERROR_MIME_TYPE);
+    ContractAssert(contentTxMetadata?.contentType?.startsWith(podcastContentType), ERROR_MIME_TYPE);
 
     podcasts[pidIndex]["episodes"].push({
       eid: SmartWeave.transaction.id,
       episodeName: name,
       description: description,
       contentTx: content,
+      size: contentTxMetadata?.size,
       uploader: jwk_n,
       uploadedAt: EXM.getDate().getTime(),
       isVisible: true,
@@ -423,6 +434,9 @@ export async function handle(state, action) {
 
     if (cover) {
       _validateArweaveAddress(cover);
+      const coverTxObject = await _getTxObject(cover);
+      const coverTxMetadata = _getTxMetadata(coverTxObject);
+      ContractAssert(coverTxMetadata?.contentType?.startsWith(`image/`), ERROR_MIME_TYPE);
       podcast["cover"] = cover;
     }
 
@@ -440,7 +454,7 @@ export async function handle(state, action) {
     }
 
     if (categories) {
-      ContractAssert(categories.length, "ERROR_NO_CATEGORY_PROVIDED");
+      ContractAssert(categories.length, ERROR_NO_CATEGORY_PROVIDED);
       podcast["categories"] = categories
         .split(",")
         .map((category) => category.trim());
@@ -1110,4 +1124,27 @@ export async function handle(state, action) {
   function _notPaused() {
     ContractAssert(!state.isPaused, ERROR_CONTRACT_PAUSED);
   }
+
+  async function _getTxObject(txid) {
+    try {
+      _validateArweaveAddress(txid);
+      const req = await EXM.deterministicFetch(`${state.ar_molecule_endpoint}/tx-gql/${txid}`);
+      return req.asJSON();
+    } catch(error) {
+      throw new ContractError(ERROR_MOLECULE_SERVER_ERROR);
+    }
+  }
+
+  function _getTxMetadata(txObj) {
+    try {
+      const contentType = (txObj?.tags?.find((tag) => tag?.name?.toLowerCase() == "content-type"))?.value;
+      const size = Number(txObj?.data?.size);
+      ContractAssert(!!size, ERROR_INVALID_DATA_SIZE_TX);
+
+      return {contentType, size};
+    } catch(error) {
+      throw new ContractError(ERROR_PARSING_TX_METADATA);
+    }
+  }
+
 }
