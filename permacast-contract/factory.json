@@ -10,6 +10,7 @@
   "fees_handler_endpoint": "https://permacast-fees-handler.herokuapp.com/validate",
   "fees_networks": ["ethereum"],
   "supported_tokens": ["ETH"],
+  "ar_molecule_endpoint": "http://ar.molecule.sh",
   "paid_fees": [],
   "signatures": [],
   "admins_signatures": [],
