@@ -268,6 +268,7 @@ export async function handle(state, action) {
       description: description,
       contentTx: content,
       size: contentTxMetadata?.size,
+      type: contentTxMetadata?.contentType,
       uploader: caller,
       uploadedAt: EXM.getDate().getTime(),
       isVisible: true,
