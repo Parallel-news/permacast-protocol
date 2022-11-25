@@ -150,6 +150,7 @@ export async function handle(state, action) {
 
     const coverTxObject = await _getTxObject(cover);
     const coverTxMetadata = _getTxMetadata(coverTxObject);
+    const caller = await _ownerToAddress(jwk_n);
 
     const pid = SmartWeave.transaction.id;
 
@@ -195,7 +196,7 @@ export async function handle(state, action) {
       contentType: contentType,
       createdAt: EXM.getDate().getTime(),
       index: _getPodcastIndex(), // id equals the index of the podacast obj in the podcasts array
-      owner: jwk_n,
+      owner: caller,
       podcastName: name,
       author: author,
       email: email,
@@ -241,13 +242,14 @@ export async function handle(state, action) {
     await _verifyArSignature(jwk_n, sig);
     const contentTxObject = await _getTxObject(content);
     const contentTxMetadata = _getTxMetadata(contentTxObject);
+    const caller = await _ownerToAddress(jwk_n);
 
     const eid = SmartWeave.transaction.id;
     const pidIndex = _getAndValidatePidIndex(pid);
 
     ContractAssert(
-      podcasts[pidIndex]["owner"] === jwk_n ||
-        podcasts[pidIndex]["maintainers"].includes(jwk_n),
+      podcasts[pidIndex]["owner"] === caller ||
+        podcasts[pidIndex]["maintainers"].includes(caller),
       ERROR_INVALID_CALLER
     );
 
@@ -266,7 +268,7 @@ export async function handle(state, action) {
       description: description,
       contentTx: content,
       size: contentTxMetadata?.size,
-      uploader: jwk_n,
+      uploader: caller,
       uploadedAt: EXM.getDate().getTime(),
       isVisible: true,
     });
@@ -297,14 +299,15 @@ export async function handle(state, action) {
     await _verifyArSignature(jwk_n, sig);
 
     const pidIndex = _getAndValidatePidIndex(pid);
+    const caller = await _ownerToAddress(jwk_n);
 
-    ContractAssert(podcasts[pidIndex]["owner"] === jwk_n, ERROR_INVALID_CALLER);
+    ContractAssert(podcasts[pidIndex]["owner"] === caller, ERROR_INVALID_CALLER);
     ContractAssert(maintainers.length, ERROR_NO_MAINTAINERS_PROVIDED);
 
     const maintainersArray = maintainers.split(",").map((addr) => addr.trim());
 
     for (const maintainer of maintainersArray) {
-      _validateOwnerSyntax(maintainer);
+      _validateArweaveAddress(maintainer);
       ContractAssert(
         !podcasts[pidIndex]["maintainers"].includes(maintainer),
         ERROR_MAINTAINER_ALREADY_ADDED
@@ -342,9 +345,10 @@ export async function handle(state, action) {
     const sig = input.sig;
 
     _validateOwnerSyntax(jwk_n);
-    _validateOwnerSyntax(address);
+    _validateArweaveAddress(address);
     _notPaused();
     await _verifyArSignature(jwk_n, sig);
+    const caller = await _ownerToAddress(jwk_n);
 
     const pidIndex = _getAndValidatePidIndex(pid);
     const podcast = podcasts[pidIndex];
@@ -352,7 +356,7 @@ export async function handle(state, action) {
       (maintainer) => maintainer === address
     );
 
-    ContractAssert(podcast["owner"] === jwk_n, ERROR_INVALID_CALLER);
+    ContractAssert(podcast["owner"] === caller, ERROR_INVALID_CALLER);
     ContractAssert(maintainerIndex >= 0, ERROR_MAINTAINER_NOT_FOUND);
 
     podcast["maintainers"].splice(maintainerIndex, 1);
@@ -398,11 +402,12 @@ export async function handle(state, action) {
     _validateOwnerSyntax(jwk_n);
     _notPaused();
     await _verifyArSignature(jwk_n, sig);
+    const caller = await _ownerToAddress(jwk_n);
 
     const pidIndex = _getAndValidatePidIndex(pid);
     const podcast = podcasts[pidIndex];
 
-    ContractAssert(podcast["owner"] === jwk_n, ERROR_INVALID_CALLER);
+    ContractAssert(podcast["owner"] === caller, ERROR_INVALID_CALLER);
 
     if (name) {
       _validateStringTypeLen(name, POD_NAME_LIMITS.min, POD_NAME_LIMITS.max);
@@ -499,12 +504,13 @@ export async function handle(state, action) {
     _validateOwnerSyntax(jwk_n);
     _notPaused();
     await _verifyArSignature(jwk_n, sig);
+    const caller = await _ownerToAddress(jwk_n);
 
     const pid = _getPidOfEid(eid);
     const pidIndex = _getAndValidatePidIndex(pid);
     const eidIndex = _getAndValidateEidIndex(eid, pidIndex);
 
-    ContractAssert(podcasts[pidIndex]["owner"] === jwk_n, ERROR_INVALID_CALLER);
+    ContractAssert(podcasts[pidIndex]["owner"] === caller, ERROR_INVALID_CALLER);
     const episode = podcasts[pidIndex]["episodes"][eidIndex];
 
     if (name) {
@@ -554,6 +560,7 @@ export async function handle(state, action) {
     _validateOwnerSyntax(jwk_n);
     _notPaused();
     await _verifyArSignature(jwk_n, sig);
+    const caller = await _ownerToAddress(jwk_n);
 
     ContractAssert(Number.isInteger(newIndex), ERROR_INVALID_PRIMITIVE_TYPE);
 
@@ -563,7 +570,7 @@ export async function handle(state, action) {
 
     const podcast = podcasts[pidIndex];
 
-    ContractAssert(podcast["owner"] === jwk_n, ERROR_INVALID_CALLER);
+    ContractAssert(podcast["owner"] === caller, ERROR_INVALID_CALLER);
     ContractAssert(
       0 <= newIndex && newIndex < podcast["episodes"].length,
       ERROR_INVALID_NEW_EP_INDEX
@@ -591,7 +598,6 @@ export async function handle(state, action) {
      *
      * @param admin_jwk_n the public key of the contract's admin
      * @param user_jwk_n the user's (podcast owner) public key
-     * @param admin_sig the message signed by the admin's pub key
      * @param user_sig the message signed by the user's pub_key
      * @param eid Epsiode EID
      * @param store the currently used Mintbase store contract address
@@ -600,21 +606,19 @@ export async function handle(state, action) {
      * @return state
      *
      **/
-
-    const admin_jwk_n = input.admin_jwk_n;
     const user_jwk_n = input.user_jwk_n;
-    const admin_sig = input.admin_sig;
     const user_sig = input.user_sig;
     const eid = input.eid;
     const store = input.store;
     const token_id = input.token_id;
 
+    const admin_jwk_n = state.admins[0];
     _notPaused();
-    _validateOwnerSyntax(admin_jwk_n);
     _validateOwnerSyntax(user_jwk_n);
 
     await _verifyAdminArSignature(admin_jwk_n, admin_sig);
     await _verifyArSignature(user_jwk_n, user_sig);
+    const caller = await _ownerToAddress(user_jwk_n);
 
     ContractAssert(admin_sig !== user_sig, ERROR_SIG_COMPOUND_DUPLICATION); // admin cant self-tokenize episodes
 
@@ -624,7 +628,7 @@ export async function handle(state, action) {
 
     ContractAssert(stores.includes(store), ERROR_INVALID_STORE);
     ContractAssert(
-      podcasts[pidIndex]["owner"] === user_jwk_n,
+      podcasts[pidIndex]["owner"] === caller,
       ERROR_INVALID_CALLER
     );
     _checkTokenId(store, token_id);
@@ -656,7 +660,6 @@ export async function handle(state, action) {
      * @param podcastDesc corresponding new limitations
      * @param episodeDesc corresponding new limitations
      * @param pid corresponding new limitations
-     * @param jwk_n the public key of the caller (admin)
      * @param sig a message signed by the caller's public key
      *
      * @return state
@@ -668,11 +671,9 @@ export async function handle(state, action) {
     const authorName = input.authorName;
     const podcastDesc = input.podcastDesc;
     const episodeDesc = input.episodeDesc;
-
-    const jwk_n = input.jwk_n;
     const sig = input.sig;
 
-    await _verifyAdminArSignature(jwk_n, sig);
+    await _verifyAdminArSignature(state.admins[0], sig);
 
     if (podcastName) {
       const minMax = _validateAndReturnLimits(podcastName);
@@ -712,8 +713,6 @@ export async function handle(state, action) {
      * @dev the contract admin can add a new message
      * that gets considered as the newly accepted
      * signature msg body.
-     *
-     * @param jwk_n the public key of the admin
      * @param sig a message signed of the currently used
      * message structure signed by the contract's admin
      * @param newMessage the new message string literal
@@ -723,13 +722,11 @@ export async function handle(state, action) {
      * @return state
      *
      **/
-    const jwk_n = input.jwk_n;
     const sig = input.sig;
     const newMessage = input.newMessage;
     const type = input.type;
 
-    _validateOwnerSyntax(jwk_n);
-    await _verifyAdminArSignature(jwk_n, sig);
+    await _verifyAdminArSignature(state.admins[0], sig);
     _validateStringTypeLen(newMessage, 1, 1e4);
 
     ContractAssert(
@@ -755,13 +752,11 @@ export async function handle(state, action) {
      *
      **/
 
-    const jwk_n = input.jwk_n;
     const sig = input.sig;
     const store = input.store;
     const action = input.action;
 
-    _validateOwnerSyntax(jwk_n);
-    await _verifyAdminArSignature(jwk_n, sig);
+    await _verifyAdminArSignature(state.admins[0], sig);
 
     ContractAssert(
       ["add", "remove"].includes(action),
@@ -792,17 +787,14 @@ export async function handle(state, action) {
      * public functions. Invoking this function reverse
      * the value of `isPaused` property in the contract's state
      *
-     * @param jwk_n the public key of the admin
      * @param sig a message signed by the admin's pub key
      *
      * @return state
      *
      **/
-    const jwk_n = input.jwk_n;
     const sig = input.sig;
 
-    _validateOwnerSyntax(jwk_n);
-    await _verifyAdminArSignature(jwk_n, sig);
+    await _verifyAdminArSignature(state.admins[0], sig);
 
     state.isPaused = !state.isPaused;
 
@@ -814,7 +806,6 @@ export async function handle(state, action) {
      * @dev updating the API endpoint of the
      * podcast's creation fee handler proxy.
      *
-     * @param jwk_n the public key of the admin
      * @param sig a message signed by the admin's pub key
      * @param endpoint the new proxy endpoint URL
      *
@@ -822,12 +813,10 @@ export async function handle(state, action) {
      *
      **/
 
-    const jwk_n = input.jwk_n;
     const sig = input.sig;
     const endpoint = input.endpoint;
 
-    _validateOwnerSyntax(jwk_n);
-    await _verifyAdminArSignature(jwk_n, sig);
+    await _verifyAdminArSignature(state.admins[0], sig);
 
     ContractAssert(
       endpoint.startsWith("https://"),
@@ -842,8 +831,6 @@ export async function handle(state, action) {
     /**
      * @dev modify the accepted tokens by the
      * proxy node that process paid podcast fees validation.
-     *
-     * @param jwk_n the public key of the admin
      * @param sig a message signed by the admin's pub key
      * @param token the newly accepted token ticker (uppercase)
      * @param action modification action: 'add' or 'remove'
@@ -852,13 +839,11 @@ export async function handle(state, action) {
      *
      **/
 
-    const jwk_n = input.jwk_n;
     const sig = input.sig;
     const token = input.token;
     const action = input.action;
 
-    _validateOwnerSyntax(jwk_n);
-    await _verifyAdminArSignature(jwk_n, sig);
+    await _verifyAdminArSignature(state.admins[0], sig);
 
     ContractAssert(
       ["add", "remove"].includes(action),
@@ -891,8 +876,6 @@ export async function handle(state, action) {
     /**
      * @dev modify the supported blockchain networks supported
      * by the proxy node that process paid podcast fees validation.
-     *
-     * @param jwk_n the public key of the admin
      * @param sig a message signed by the admin's pub key
      * @param network the newly accepted network name (lowecase)
      * @param action modification action: 'add' or 'remove'
@@ -900,13 +883,11 @@ export async function handle(state, action) {
      * @return state
      *
      **/
-    const jwk_n = input.jwk_n;
     const sig = input.sig;
     const network = input.network;
     const action = input.action;
 
-    _validateOwnerSyntax(jwk_n);
-    await _verifyAdminArSignature(jwk_n, sig);
+    await _verifyAdminArSignature(state.admins[0], sig);
 
     ContractAssert(
       ["add", "remove"].includes(action),
@@ -1147,4 +1128,14 @@ export async function handle(state, action) {
     }
   }
 
+  async function _ownerToAddress(pubkey) {
+    try {
+      const req = await EXM.deterministicFetch(`${state.ar_molecule_endpoint}/ota/${pubkey}`);
+      const address = (req.asJSON())?.address;
+      _validateArweaveAddress(address);
+      return address;
+    } catch(error) {
+      throw new ContractError(ERROR_MOLECULE_SERVER_ERROR);
+    }
+  }
 }
