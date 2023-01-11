@@ -980,7 +980,7 @@ export async function handle(state, action) {
       });
     }
 
-    return { podcasts };
+    return { result: podcasts };
   }
 
   if (input.function === "queryEpisodes") {
@@ -1017,7 +1017,7 @@ export async function handle(state, action) {
       episodes = episodes.slice(0, limit);
     }
 
-    return { episodes };
+    return { result: episodes };
   }
 
   function _validateArweaveAddress(address) {
