@@ -23,6 +23,10 @@
       "min": 10,
       "max": 15000
     },
+    "podcast_mini_cover_len": {
+      "min": 1,
+      "max": 65536
+    },
     "author_name_len": {
       "min": 2,
       "max": 150

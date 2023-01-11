@@ -38,6 +38,7 @@ export async function handle(state, action) {
   // LIMITATION METADATA STATE ACCESS
   const POD_NAME_LIMITS = limitations["podcast_name_len"];
   const POD_DESC_LIMITS = limitations["podcast_desc_len"];
+  const POD_MINI_COVER_LIMITS = limitations["podcast_mini_cover_len"];
   const EP_NAME_LIMITS = limitations["episode_name_len"];
   const EP_DESC_LIMITS = limitations["episode_desc_len"];
   const AUTHOR_NAME_LIMITS = limitations["author_name_len"];
@@ -61,6 +62,7 @@ export async function handle(state, action) {
   const ERROR_INVALID_NEW_EP_INDEX = `ERROR_INVALID_NEW_INDEX_FOR_THE_EPISODE`;
   const ERROR_NO_EP_INDEX_CHANGE = `ERROR_NEW_AND_OLD_EPISODE_INDEX_ARE_EQUAL`;
   const ERROR_LIMITATIONS_NOT_INTEGERS = `ERROR_LIMITATIONS_MUST_BE_INTEGERS`;
+  const ERROR_LIMITATION_NOT_INTEGER = `ERROR_GIVEN_LIMITATION_IS_NOT_AN_INTEGER`;
   const ERROR_INVALID_SIG_TYPE = `ERROR_INVALID_SIGNATURE_TYPE`;
   const ERROR_INVALID_MODIFICATION_ACTION = `ERROR_INVALID_MODIFICATION_ACTION_ADD_OR_REMOVE`;
   const ERROR_INVALID_STORE_SYNTAX = `ERROR_STORE_MUST_BE_STRING`;
@@ -89,11 +91,14 @@ export async function handle(state, action) {
   const ERROR_INVALID_PAYMENT = `ERROR_PAYMENT_TX_DROPPED_OR_PENDING_UNDERPAID`;
   const ERROR_CONTRACT_PAUSED = `ERROR_CANNOT_INVOKE_FUNCTION_WHILE_CONTRACT_IS_PAUSED`;
   const ERROR_LABEL_IN_USE = `ERROR_PODCAST_LABEL_IS_USED`;
+  const ERROR_COVER_SIZE_TOO_BIG = `ERROR_COVER_SIZE_EXCEEDS_MAX`;
+  const ERROR_COVER_SIZE_TOO_SMALL = `ERROR_COVER_SIZE_TOO_SMALL`;
   const ERROR_MOLECULE_SERVER_ERROR = `ERROR_UNEXPECTED_ERROR_FROM_MOLECULE`;
   const ERROR_NO_CATEGORY_PROVIDED = `ERROR_MUST_PROVIDE_CATEGORY_TO_UPDATE`;
   const ERROR_INVALID_DATA_SIZE_TX = `ERROR_EMPTY_DATA_TRANSACTION`; 
   const ERROR_PARSING_TX_METADATA = `ERROR_GETTING_TX_METADATA`;
-
+  const ERROR_INVALID_QUERY_PARAMS_TYPE = `ERROR_QUERY_PARAMS_MUST_BE_OBJECT`;
+  const ERROR_TRIM_NOT_BOOLEAN = `ERROR_TRIM_MUST_BE_BOOLEAN`;
 
   if (input.function === "createPodcast") {
     /**
@@ -110,6 +115,7 @@ export async function handle(state, action) {
      * @param categories RSS supported categories strings
      * @param email author email address
      * @param cover Arweave data TXID of type `image/*`
+     * @param minifiedCover Arweave data TXID of type `image/*` (minified)
      * @param contentType 'a' or 'v' indication audio or
      * video (content type) that will be supported in this podcast.
      * @param maintainers a string of maintainers comma separated
@@ -132,6 +138,7 @@ export async function handle(state, action) {
     const categories = input.categories;
     const email = input.email;
     const cover = input.cover;
+    const minifiedCover = input.minifiedCover
     const maintainers = input?.maintainers;
     const jwk_n = input.jwk_n;
     const sig = input.sig;
@@ -150,11 +157,18 @@ export async function handle(state, action) {
 
     const coverTxObject = await _getTxObject(cover);
     const coverTxMetadata = _getTxMetadata(coverTxObject);
+    const minifiedCoverTxObject = await _getTxObject(minifiedCover);
+    const minifiedCoverTxMetadata = _getTxMetadata(minifiedCoverTxObject);
+
     const caller = await _ownerToAddress(jwk_n);
 
     const pid = SmartWeave.transaction.id;
 
     ContractAssert(coverTxMetadata?.contentType?.startsWith(`image/`), ERROR_MIME_TYPE);
+    ContractAssert(minifiedCoverTxMetadata?.contentType?.startsWith(`image/`), ERROR_MIME_TYPE);
+
+    contractAssert(minifiedCoverTxMetadata?.size > POD_MINI_COVER_LIMITS.max, ERROR_COVER_SIZE_TOO_BIG);
+    contractAssert(minifiedCoverTxMetadata?.size < POD_MINI_COVER_LIMITS.min, ERROR_COVER_SIZE_TOO_SMALL);
 
     _validateStringTypeLen(
       description,
@@ -915,6 +929,95 @@ export async function handle(state, action) {
 
       return { state };
     }
+  }
+
+
+  /*************** QUERY FUNCTIONS ***************/
+
+  if (input.function === "queryPodcasts") {
+    /**
+     * @dev query podcasts from the contract's state
+     * @param {Object} [params] - query parameters object, can query by all podcast parameters
+     * @param {Number} [limit] the maximum number of podcasts to return, good for pagination
+     * @param {Boolean} [trimEpisodes] if true, the episodes array will removed from the returned podcasts.
+     * good for reducing the size of the response
+     * @return {Array} podcasts
+     *
+     **/
+
+    const params = input?.params;
+    const limit = input?.limit;
+    const trimEpisodes = input?.trimEpisodes;
+
+    let podcasts = [...state.podcasts];
+
+    if (params) {
+      ContractAssert(
+        typeof params === "object",
+        ERROR_INVALID_QUERY_PARAMS_TYPE
+      );
+    };
+    if (limit) {
+      ContractAssert(typeof limit === "number", ERROR_LIMITATION_NOT_INTEGER);
+    };
+    if (trimEpisodes) {
+      ContractAssert(typeof trimEpisodes === "boolean", ERROR_TRIM_NOT_BOOLEAN);
+    };
+
+    for (const prop in params) {
+      // Filter the podcasts by the current property
+      podcasts = podcasts.filter(podcast => podcast[prop] === query[prop]);
+    }
+
+    if (limit) {
+      podcasts = podcasts.slice(0, limit);
+    }
+
+    if (trimEpisodes) {
+      podcasts = podcasts.map((podcast) => {
+        podcast.episodes = [];
+        return podcast;
+      });
+    }
+
+    return { podcasts };
+  }
+
+  if (input.function === "queryEpisodes") {
+    /**
+     * @dev query episodes from the contract's state
+     * @param {Object} [params] - query parameters object, can query by all episode parameters
+     * @param {Number} [limit] the maximum number of episodes to return, good for pagination
+     * good for reducing the size of the response
+     * @return {Array} episodes
+     *
+     **/
+
+    const params = input?.params;
+    const limit = input?.limit;
+
+    let episodes = [...state.podcasts.map((podcast) => podcast.episodes).flat(1)];
+
+    if (params) {
+      ContractAssert(
+        typeof params === "object",
+        ERROR_INVALID_QUERY_PARAMS_TYPE
+      );
+    };
+    if (limit) {
+      ContractAssert(typeof limit === "number", ERROR_LIMITATION_NOT_INTEGER);
+    };
+
+    for (const prop in params) {
+      // Filter the podcasts by the current property
+      episodes = episodes.filter(podcast => podcast[prop] === query[prop]);
+    }
+
+    if (limit) {
+      episodes = episodes.slice(0, limit);
+    }
+
+    return { episodes };
   }
 
   function _validateArweaveAddress(address) {
