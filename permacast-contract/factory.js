@@ -91,8 +91,7 @@ export async function handle(state, action) {
   const ERROR_INVALID_PAYMENT = `ERROR_PAYMENT_TX_DROPPED_OR_PENDING_UNDERPAID`;
   const ERROR_CONTRACT_PAUSED = `ERROR_CANNOT_INVOKE_FUNCTION_WHILE_CONTRACT_IS_PAUSED`;
   const ERROR_LABEL_IN_USE = `ERROR_PODCAST_LABEL_IS_USED`;
-  const ERROR_COVER_SIZE_TOO_BIG = `ERROR_COVER_SIZE_EXCEEDS_MAX`;
-  const ERROR_COVER_SIZE_TOO_SMALL = `ERROR_COVER_SIZE_TOO_SMALL`;
+  const ERROR_COVER_SIZE_UNACCEPTABLE = `ERROR_COVER_SIZE_TOO_BIG_OR_TOO_SMALL`;
   const ERROR_MOLECULE_SERVER_ERROR = `ERROR_UNEXPECTED_ERROR_FROM_MOLECULE`;
   const ERROR_NO_CATEGORY_PROVIDED = `ERROR_MUST_PROVIDE_CATEGORY_TO_UPDATE`;
   const ERROR_INVALID_DATA_SIZE_TX = `ERROR_EMPTY_DATA_TRANSACTION`; 
@@ -167,8 +166,10 @@ export async function handle(state, action) {
     ContractAssert(coverTxMetadata?.contentType?.startsWith(`image/`), ERROR_MIME_TYPE);
     ContractAssert(minifiedCoverTxMetadata?.contentType?.startsWith(`image/`), ERROR_MIME_TYPE);
 
-    contractAssert(minifiedCoverTxMetadata?.size > POD_MINI_COVER_LIMITS.max, ERROR_COVER_SIZE_TOO_BIG);
-    contractAssert(minifiedCoverTxMetadata?.size < POD_MINI_COVER_LIMITS.min, ERROR_COVER_SIZE_TOO_SMALL);
+    ContractAssert((
+      Number(minifiedCoverTxMetadata?.size || 0) <= POD_MINI_COVER_LIMITS.max &&
+      Number(minifiedCoverTxMetadata?.size || 0) >= POD_MINI_COVER_LIMITS.min
+    ), ERROR_COVER_SIZE_UNACCEPTABLE);
 
     _validateStringTypeLen(
       description,
@@ -189,6 +190,7 @@ export async function handle(state, action) {
       CATEGORY_LIMITS.max
     );
     _validateStringTypeLen(cover, 43, 43);
+    _validateStringTypeLen(minifiedCover, 43, 43);
     _validateStringTypeLen(lang, LANG_CHAR_LIMITS.min, LANG_CHAR_LIMITS.max);
 
     ContractAssert(
@@ -220,6 +222,7 @@ export async function handle(state, action) {
       categories: categories.split(",").map((category) => category.trim()),
       maintainers: maintainersArray,
       cover: cover,
+      minifiedCover: minifiedCover,
       isVisible: true,
       episodes: [],
     });
