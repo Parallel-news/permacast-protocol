@@ -1,12 +1,12 @@
 <p align="center">
-  <a href="https://permacast.dev">
+  <a href="https://permacast.app">
     <img src="./img/pc-icons/logo192.png" height="124">
   </a>
   <p align="center">A Novel Protocol For Permanent Podcasting Storage & Indexing</p>
 </p>
 
 ## Synopsis
-Permacast is a new protocol that empowers podcasting and facilitates a secure, anti-censorship, private, and permanent storage for podcasts, in addition to content indexing, discovery, and interoperability with web2 podcasting infrastructure. To learn more about Permacast, visit our [website](https://permacast.dev)
+Permacast is a new protocol that empowers podcasting and facilitates a secure, anti-censorship, private, and permanent storage for podcasts, in addition to content indexing, discovery, and interoperability with web2 podcasting infrastructure. To learn more about Permacast, visit our [website](https://permacast.app)
 
 ## Build and Test Locally
 
