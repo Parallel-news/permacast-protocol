@@ -13,9 +13,9 @@
  *
  *                         A Novel Protocol For Permanent Podcasting Storage & Indexing
  *
- * @version Mainnet V1 - Bloodstone Version
+ * @version Mainnet V2 - Bloodstone Version
  * @author charmful0x
- * @website permacast.dev
+ * @website permacast.app
  * @license MIT
  *
  **/
@@ -27,26 +27,20 @@ export async function handle(state, action) {
   const podcasts = state.podcasts;
   const limitations = state.limitations;
   const signatures = state.signatues;
-  const admins = state.admins;
-  const admins_signatures = state.admins_signatures;
-  const user_sig_messages = state.user_sig_messages;
-  const admin_sig_messages = state.admin_sig_messages;
-  const stores = state.stores;
+  const admin = state.admin;
+  const sig_messages = state.sig_messages;
   const paid_fees = state.paid_fees;
   const isPaused = state.isPaused;
 
   // LIMITATION METADATA STATE ACCESS
   const POD_NAME_LIMITS = limitations["podcast_name_len"];
-  const POD_DESC_LIMITS = limitations["podcast_desc_len"];
   const EP_NAME_LIMITS = limitations["episode_name_len"];
-  const EP_DESC_LIMITS = limitations["episode_desc_len"];
   const AUTHOR_NAME_LIMITS = limitations["author_name_len"];
   const LANG_CHAR_LIMITS = limitations["lang_char_code"];
   const CATEGORY_LIMITS = limitations["categories"];
-  const PID_LIMITS = limitations["pid"];
 
   // ERRORS List
-  const ERROR_INVALID_CALLER = `ERROR_THEPUBKEY_OF_THE_CALLER_IS_NOT_ALLOWED_TO_CALL_THIS_FUNCTION`;
+  const ERROR_INVALID_CALLER = `ERROR_THE_PUBKEY_OF_THE_CALLER_IS_NOT_ALLOWED_TO_CALL_THIS_FUNCTION`;
   const ERROR_INVALID_PRIMITIVE_TYPE = `ERROR_THE_PASSED_FUNCTION_ARGUMENT_IS_NOT_A_SCOPE_VALID_PRIMITIVE_TYPE`;
   const ERROR_INVALID_STRING_LENGTH = `ERROR_THE_STRING_LITERAL_IS_OUT_OF_THE_ALLOWED_STR_LEN`;
   const ERROR_MIME_TYPE = `ERROR_THE_MIME_TYPE_IS_NOT_SPPORTED`;
@@ -91,126 +85,129 @@ export async function handle(state, action) {
   const ERROR_LABEL_IN_USE = `ERROR_PODCAST_LABEL_IS_USED`;
   const ERROR_MOLECULE_SERVER_ERROR = `ERROR_UNEXPECTED_ERROR_FROM_MOLECULE`;
   const ERROR_NO_CATEGORY_PROVIDED = `ERROR_MUST_PROVIDE_CATEGORY_TO_UPDATE`;
-  const ERROR_INVALID_DATA_SIZE_TX = `ERROR_EMPTY_DATA_TRANSACTION`; 
+  const ERROR_INVALID_DATA_SIZE_TX = `ERROR_EMPTY_DATA_TRANSACTION`;
   const ERROR_PARSING_TX_METADATA = `ERROR_GETTING_TX_METADATA`;
-
+  const ERROR_STATES_PORTING_DONE = `ERROR_AMBER_BLOODSTONE_MIGRATION_DONE`;
 
   if (input.function === "createPodcast") {
-    /**
-     * @dev create a podcast object and append it to
-     * the smart contract state (Factory). Only the podcast owner
-     * and its maintainers can perform write acions.
-     *
-     * @param name podcast name
-     * @param desc podcast description
-     * @param author podcast author
-     * @param lang language char code (ISO 639-1:2002)
-     * @param isExplicit indicates the existence of
-     * explicit content, used for RSS feed generating
-     * @param categories RSS supported categories strings
-     * @param email author email address
-     * @param cover Arweave data TXID of type `image/*`
-     * @param contentType 'a' or 'v' indication audio or
-     * video (content type) that will be supported in this podcast.
-     * @param maintainers a string of maintainers comma separated
-     * @param jwk_n the public key of the caller
-     * @param sig a message signed by the caller's public key
-     * @param master_network master network key for the fee payment
-     * @param network token's network of the fee payment
-     * @param token fee payment token ticker
-     * @param txid the transaction ID of the fee payment
-     *
-     * @return state
-     **/
+    try {
+      /**
+       * @dev create a podcast object and append it to
+       * the smart contract state (Factory). Only the podcast owner
+       * and its maintainers can perform write acions.
+       *
+       * @param name podcast name
+       * @param desc podcast description (arseed TXID)
+       * @param author podcast author
+       * @param lang language char code (ISO 639-1:2002)
+       * @param isExplicit indicates the existence of
+       * explicit content, used for RSS feed generating
+       * @param categories RSS supported categories strings
+       * @param email author email address
+       * @param cover Arweave data TXID of type `image/*` (arseed TXID)
+       * @param minifiedCover Arweave data TXID of type `image/*` (minified - arseed TXID)
+       * @param maintainers a string of maintainers comma separated
+       * @param jwk_n the public key of the caller
+       * @param sig a message signed by the caller's public key
+       * @param txid the transaction ID of the fee payment (EverFinance)
+       *
+       * @return state
+       **/
 
-    const name = input.name;
-    const label = input.label;
-    const description = input.desc;
-    const author = input.author;
-    const lang = input.lang;
-    const isExplicit = input.isExplicit;
-    const categories = input.categories;
-    const email = input.email;
-    const cover = input.cover;
-    const maintainers = input?.maintainers;
-    const jwk_n = input.jwk_n;
-    const sig = input.sig;
-    const master_network = input.master_network;
-    const network = input.network;
-    const token = input.token;
-    const txid = input.txid;
+      const name = input.name;
+      const label = input.label;
+      const description = input.desc;
+      const author = input.author;
+      const lang = input.lang;
+      const isExplicit = input.isExplicit;
+      const categories = input.categories;
+      const email = input.email;
+      const cover = input.cover;
+      const minifiedCover = input.minifiedCover;
+      const maintainers = input?.maintainers;
+      const jwk_n = input.jwk_n;
+      const sig = input.sig;
+      const txid = input.txid;
 
-    let maintainersArray = [];
-    const validatedLabel = _validateLabel(label);
-    const contentType = input.contentType === "a" ? "audio/" : "video/";
-    _notPaused();
-    _validateOwnerSyntax(jwk_n);
-    await _verifyArSignature(jwk_n, sig);
-    await _validatePayment(master_network, network, token, txid);
+      let maintainersArray = [];
+      const caller = await _ownerToAddress(jwk_n);
+      const validatedLabel = _validateLabel(label);
+      _notPaused();
+      _notSharded();
+      await _verifyArSignature(jwk_n, sig);
+      await _validatePayment(caller, txid);
+      const inputTxsMetadata = await _getTxsMetadata(
+        btoa(JSON.stringify([cover, minifiedCover, description]))
+      );
 
-    const coverTxObject = await _getTxObject(cover);
-    const coverTxMetadata = _getTxMetadata(coverTxObject);
-    const caller = await _ownerToAddress(jwk_n);
+      ContractAssert(
+        inputTxsMetadata?.[description]?.mime?.startsWith(`text/markdown`),
+        ERROR_MIME_TYPE
+      );
+      ContractAssert(
+        inputTxsMetadata?.[cover]?.mime?.startsWith(`image/`),
+        ERROR_MIME_TYPE
+      );
+      ContractAssert(
+        inputTxsMetadata?.[minifiedCover]?.mime?.startsWith(`image/`),
+        ERROR_MIME_TYPE
+      );
 
-    const pid = SmartWeave.transaction.id;
+      const pid = SmartWeave.transaction.id;
 
-    ContractAssert(coverTxMetadata?.contentType?.startsWith(`image/`), ERROR_MIME_TYPE);
+      _validateStringTypeLen(name, POD_NAME_LIMITS.min, POD_NAME_LIMITS.max);
+      _validateStringTypeLen(
+        author,
+        AUTHOR_NAME_LIMITS.min,
+        AUTHOR_NAME_LIMITS.max
+      );
+      _validateStringTypeLen(email, 0, 320);
+      _validateStringTypeLen(
+        categories,
+        CATEGORY_LIMITS.min,
+        CATEGORY_LIMITS.max
+      );
+      _validateStringTypeLen(cover, 43, 43);
+      _validateStringTypeLen(minifiedCover, 43, 43);
+      _validateStringTypeLen(lang, LANG_CHAR_LIMITS.min, LANG_CHAR_LIMITS.max);
 
-    _validateStringTypeLen(
-      description,
-      POD_DESC_LIMITS.min,
-      POD_DESC_LIMITS.max
-    );
+      ContractAssert(
+        ["yes", "no"].includes(isExplicit),
+        ERROR_INVALID_PRIMITIVE_TYPE
+      );
 
-    _validateStringTypeLen(name, POD_NAME_LIMITS.min, POD_NAME_LIMITS.max);
-    _validateStringTypeLen(
-      author,
-      AUTHOR_NAME_LIMITS.min,
-      AUTHOR_NAME_LIMITS.max
-    );
-    _validateStringTypeLen(email, 0, 320);
-    _validateStringTypeLen(
-      categories,
-      CATEGORY_LIMITS.min,
-      CATEGORY_LIMITS.max
-    );
-    _validateStringTypeLen(cover, 43, 43);
-    _validateStringTypeLen(lang, LANG_CHAR_LIMITS.min, LANG_CHAR_LIMITS.max);
+      if (maintainers?.length) {
+        maintainersArray = maintainers.split(",").map((addr) => addr.trim());
 
-    ContractAssert(
-      ["yes", "no"].includes(isExplicit),
-      ERROR_INVALID_PRIMITIVE_TYPE
-    );
-
-    if (maintainers?.length) {
-      maintainersArray = maintainers.split(",").map((addr) => addr.trim());
-
-      for (const maintainer of maintainersArray) {
-        _validateArweaveAddress(maintainer);
+        for (const maintainer of maintainersArray) {
+          _validateArweaveAddress(maintainer);
+        }
       }
+
+      podcasts.push({
+        pid: pid,
+        label: validatedLabel,
+        createdAt: EXM.getDate().getTime(),
+        index: _getPodcastIndex(),
+        owner: caller,
+        podcastName: name,
+        author: author,
+        email: email,
+        description: description,
+        language: lang,
+        explicit: isExplicit,
+        categories: categories.split(",").map((category) => category.trim()),
+        maintainers: maintainersArray,
+        cover: cover,
+        minifiedCover: minifiedCover,
+        isVisible: true,
+        episodes: [],
+      });
+
+      return { state };
+    } catch (error) {
+      throw new ContractError("ERROR_CREATING_PODCAST");
     }
-
-    podcasts.push({
-      pid: pid,
-      label: validatedLabel,
-      contentType: contentType,
-      createdAt: EXM.getDate().getTime(),
-      index: _getPodcastIndex(), // id equals the index of the podacast obj in the podcasts array
-      owner: caller,
-      podcastName: name,
-      author: author,
-      email: email,
-      description: description,
-      language: lang,
-      explicit: isExplicit,
-      categories: categories.split(",").map((category) => category.trim()),
-      maintainers: maintainersArray,
-      cover: cover,
-      isVisible: true,
-      episodes: [],
-    });
-
-    return { state };
   }
 
   if (input.function === "addEpisode") {
@@ -222,8 +219,8 @@ export async function handle(state, action) {
      *
      * @param pid podcast ID (pid). 43 chars string
      * @param name episode name
-     * @param content episode audio's or video's Arweave TXID
-     * @param desc the episode's description
+     * @param content episode audio's or video's Arseed TXID
+     * @param desc the episode's description (arseed TXID)
      * @param jwk_n the public key of the caller
      * @param sig a message signed by the caller's public key
      *
@@ -237,11 +234,8 @@ export async function handle(state, action) {
     const jwk_n = input.jwk_n;
     const sig = input.sig;
 
-    _validateOwnerSyntax(jwk_n);
     _notPaused();
     await _verifyArSignature(jwk_n, sig);
-    const contentTxObject = await _getTxObject(content);
-    const contentTxMetadata = _getTxMetadata(contentTxObject);
     const caller = await _ownerToAddress(jwk_n);
 
     const eid = SmartWeave.transaction.id;
@@ -253,22 +247,29 @@ export async function handle(state, action) {
       ERROR_INVALID_CALLER
     );
 
+    const inputTxsMetadata = await _getTxsMetadata(
+      btoa(JSON.stringify([content, description]))
+    );
 
-    _validateStringTypeLen(description, EP_DESC_LIMITS.min, EP_DESC_LIMITS.max);
+    ContractAssert(
+      inputTxsMetadata?.[description]?.mime?.startsWith(`text/markdown`),
+      ERROR_MIME_TYPE
+    );
+    ContractAssert(
+      inputTxsMetadata?.[content]?.mime?.startsWith(`audio/`) ||
+        inputTxsMetadata?.[content]?.mime?.startsWith(`video/`),
+      ERROR_MIME_TYPE
+    );
+
     _validateStringTypeLen(name, EP_NAME_LIMITS.min, EP_NAME_LIMITS.max);
     _validateStringTypeLen(content, 43, 43);
-
-    const podcastContentType = podcasts[pidIndex]["contentType"];
-
-    ContractAssert(contentTxMetadata?.contentType?.startsWith(podcastContentType), ERROR_MIME_TYPE);
 
     podcasts[pidIndex]["episodes"].push({
       eid: SmartWeave.transaction.id,
       episodeName: name,
       description: description,
       contentTx: content,
-      size: contentTxMetadata?.size,
-      type: contentTxMetadata?.contentType,
+      type: inputTxsMetadata?.[content]?.mime,
       uploader: caller,
       uploadedAt: EXM.getDate().getTime(),
       isVisible: true,
@@ -295,14 +296,16 @@ export async function handle(state, action) {
     const jwk_n = input.jwk_n;
     const sig = input.sig;
 
-    _validateOwnerSyntax(jwk_n);
     _notPaused();
     await _verifyArSignature(jwk_n, sig);
 
     const pidIndex = _getAndValidatePidIndex(pid);
     const caller = await _ownerToAddress(jwk_n);
 
-    ContractAssert(podcasts[pidIndex]["owner"] === caller, ERROR_INVALID_CALLER);
+    ContractAssert(
+      podcasts[pidIndex]["owner"] === caller,
+      ERROR_INVALID_CALLER
+    );
     ContractAssert(maintainers.length, ERROR_NO_MAINTAINERS_PROVIDED);
 
     const maintainersArray = maintainers.split(",").map((addr) => addr.trim());
@@ -345,7 +348,6 @@ export async function handle(state, action) {
     const jwk_n = input.jwk_n;
     const sig = input.sig;
 
-    _validateOwnerSyntax(jwk_n);
     _validateArweaveAddress(address);
     _notPaused();
     await _verifyArSignature(jwk_n, sig);
@@ -371,12 +373,12 @@ export async function handle(state, action) {
      *
      * @param pid podcast PID
      * @param name podcast name (new value)
-     * @param desc podcast description (new value)
+     * @param desc podcast description Arseed TXID (new value)
      * @param author podcast author name (new value)
      * @param lang podcast language code (new value)
      * @param isExplicit podcast explicity (for RSS, new value)
      * @param email podcast email address (new value)
-     * @param cover the TXID of the new podcast cover
+     * @param cover the Arseed TXID of the new podcast cover
      * @param isVisible podcast's visibility (new value)
      * @param categories comma separated string of podcast categories
      * @param jwk_n the caller public key
@@ -394,13 +396,13 @@ export async function handle(state, action) {
     const isExplicit = input.isExplicit;
     const email = input.email;
     const cover = input.cover;
+    const minifiedCover = input.minifiedCover;
     const isVisible = input.isVisible;
     let categories = input.categories;
     const label = input.label;
     const jwk_n = input.jwk_n;
     const sig = input.sig;
 
-    _validateOwnerSyntax(jwk_n);
     _notPaused();
     await _verifyArSignature(jwk_n, sig);
     const caller = await _ownerToAddress(jwk_n);
@@ -416,10 +418,13 @@ export async function handle(state, action) {
     }
 
     if (description) {
-      _validateStringTypeLen(
-        description,
-        POD_DESC_LIMITS.min,
-        POD_DESC_LIMITS.max
+      const descTxMetadata = await _getTxsMetadata(
+        btoa(JSON.stringify([description]))
+      );
+
+      ContractAssert(
+        descTxMetadata?.[description]?.mime?.startsWith(`text/markdown`),
+        ERROR_MIME_TYPE
       );
       podcast["description"] = description;
     }
@@ -440,10 +445,26 @@ export async function handle(state, action) {
 
     if (cover) {
       _validateArweaveAddress(cover);
-      const coverTxObject = await _getTxObject(cover);
-      const coverTxMetadata = _getTxMetadata(coverTxObject);
-      ContractAssert(coverTxMetadata?.contentType?.startsWith(`image/`), ERROR_MIME_TYPE);
+      const coverTxMetadata =  await _getTxsMetadata(
+        btoa(JSON.stringify([cover]))
+      );
+      ContractAssert(
+        coverTxMetadata?.[cover]?.mime?.startsWith(`image/`),
+        ERROR_MIME_TYPE
+      );
       podcast["cover"] = cover;
+    }
+
+    if (minifiedCover) {
+      _validateArweaveAddress(minifiedCover);
+      const coverTxMetadata =  await _getTxsMetadata(
+        btoa(JSON.stringify([minifiedCover]))
+      );
+      ContractAssert(
+        coverTxMetadata?.[minifiedCover]?.mime?.startsWith(`image/`),
+        ERROR_MIME_TYPE
+      );
+      podcast["minifiedCover"] = minifiedCover;
     }
 
     if (lang) {
@@ -487,7 +508,7 @@ export async function handle(state, action) {
      *
      * @param eid episode's EID
      * @param name episode's name (new value)
-     * @param desc episode's description (new value)
+     * @param desc episode's description (new value - Arseed TXID)
      * @param isVisible episode's visibility (new value)
      * @param jwk_n the public key of the caller
      * @param sig a message signed by the caller's public key
@@ -502,7 +523,6 @@ export async function handle(state, action) {
     const jwk_n = input.jwk_n;
     const sig = input.sig;
 
-    _validateOwnerSyntax(jwk_n);
     _notPaused();
     await _verifyArSignature(jwk_n, sig);
     const caller = await _ownerToAddress(jwk_n);
@@ -511,7 +531,10 @@ export async function handle(state, action) {
     const pidIndex = _getAndValidatePidIndex(pid);
     const eidIndex = _getAndValidateEidIndex(eid, pidIndex);
 
-    ContractAssert(podcasts[pidIndex]["owner"] === caller, ERROR_INVALID_CALLER);
+    ContractAssert(
+      podcasts[pidIndex]["owner"] === caller,
+      ERROR_INVALID_CALLER
+    );
     const episode = podcasts[pidIndex]["episodes"][eidIndex];
 
     if (name) {
@@ -520,10 +543,13 @@ export async function handle(state, action) {
     }
 
     if (description) {
-      _validateStringTypeLen(
-        description,
-        EP_DESC_LIMITS.min,
-        EP_DESC_LIMITS.max
+      const descTxMetadata = await _getTxsMetadata(
+        btoa(JSON.stringify([description]))
+      );
+
+      ContractAssert(
+        descTxMetadata?.[description]?.mime?.startsWith(`text/markdown`),
+        ERROR_MIME_TYPE
       );
       episode["description"] = description;
     }
@@ -558,17 +584,14 @@ export async function handle(state, action) {
     const jwk_n = input.jwk_n;
     const sig = input.sig;
 
-    _validateOwnerSyntax(jwk_n);
     _notPaused();
     await _verifyArSignature(jwk_n, sig);
     const caller = await _ownerToAddress(jwk_n);
 
     ContractAssert(Number.isInteger(newIndex), ERROR_INVALID_PRIMITIVE_TYPE);
-
     const pid = _getPidOfEid(eid);
     const pidIndex = _getAndValidatePidIndex(pid);
     const eidIndex = _getAndValidateEidIndex(eid, pidIndex);
-
     const podcast = podcasts[pidIndex];
 
     ContractAssert(podcast["owner"] === caller, ERROR_INVALID_CALLER);
@@ -577,70 +600,130 @@ export async function handle(state, action) {
       ERROR_INVALID_NEW_EP_INDEX
     );
     ContractAssert(newIndex !== eidIndex, ERROR_NO_EP_INDEX_CHANGE);
-
     // copy the episode
     const episode = podcast["episodes"][eidIndex];
 
     // move the episode backward/forward
     podcast["episodes"].splice(eidIndex, 1);
     podcast["episodes"].splice(newIndex, 0, episode);
+
+    return { state };
   }
 
-  // COMPOUND FUNCTION (USER + ADMIN)
+  if (input.function === "transferPodcast") {
+    const { jwk_n, sig, pid, address } = input;
 
-  if (input.function === "tokenizeEpisode") {
+    _notPaused();
+    _validateArweaveAddress(address);
+    await _verifyArSignature(jwk_n, sig);
+    const caller = await _ownerToAddress(jwk_n);
+
+    const pidIndex = _getAndValidatePidIndex(pid);
+    const podcast = podcasts[pidIndex];
+
+    ContractAssert(podcast["owner"] === caller, ERROR_INVALID_CALLER);
+    ContractAssert(
+      podcast["owner"] !== address,
+      "ERROR_INVALID_PODCAST_TRANSFER"
+    );
+    state.podcasts[pidIndex].owner = address;
+
+    return { state };
+  }
+
+  // CRONJOB FUNCTIONS
+  if (input.function === "assignEpisodeSize") {
     /**
-     * @dev a function of compound verification
-     * that requires both of the user's signature
-     * to verify his intention to tokenize one of his
-     * podcast non-tokenized episodes, and the contract's
-     * admin to ensure that the tokenized episode gets the correct
-     * token ID from the Mintbase (Near Protocol) store smart contract.
+     * @dev assign episode content data size
      *
-     * @param admin_jwk_n the public key of the contract's admin
-     * @param user_jwk_n the user's (podcast owner) public key
-     * @param user_sig the message signed by the user's pub_key
-     * @param eid Epsiode EID
-     * @param store the currently used Mintbase store contract address
-     * @param token_id the NFT token ID for the episode
+     * @param eid episode's EID
      *
      * @return state
      *
      **/
-    const user_jwk_n = input.user_jwk_n;
-    const user_sig = input.user_sig;
     const eid = input.eid;
-    const store = input.store;
-    const token_id = input.token_id;
 
-    const admin_jwk_n = state.admins[0];
     _notPaused();
-    _validateOwnerSyntax(user_jwk_n);
-
-    await _verifyAdminArSignature(admin_jwk_n, admin_sig);
-    await _verifyArSignature(user_jwk_n, user_sig);
-    const caller = await _ownerToAddress(user_jwk_n);
-
-    ContractAssert(admin_sig !== user_sig, ERROR_SIG_COMPOUND_DUPLICATION); // admin cant self-tokenize episodes
 
     const pid = _getPidOfEid(eid);
     const pidIndex = _getAndValidatePidIndex(pid);
     const eidIndex = _getAndValidateEidIndex(eid, pidIndex);
 
-    ContractAssert(stores.includes(store), ERROR_INVALID_STORE);
-    ContractAssert(
-      podcasts[pidIndex]["owner"] === caller,
-      ERROR_INVALID_CALLER
-    );
-    _checkTokenId(store, token_id);
-
     const episode = podcasts[pidIndex]["episodes"][eidIndex];
-    ContractAssert(!episode["store"], ERROR_EPISODE_ALREADY_TOKENIZED);
 
-    episode.store = store;
-    episode.token_id = token_id;
+    ContractAssert(!episode.size, "ERROR_SIZE_ALREADY_ASSIGNED");
+    const req = await EXM.deterministicFetch(
+      `${state.ar_molecule_endpoint}/tx-gql/${episode.contentTx}`
+    );
+    const size = req.asJSON()?.data.size;
+    state.podcasts[pidIndex].episodes[eidIndex].size = Number(size);
 
     return { state };
+  }
+
+  // READ FUNCTIONS
+  if (input.function === "getStateProperty") {
+    /**
+     * @dev return a state key's value
+     *
+     * @param key string representing the value's key name
+     *
+     * @return query result
+     *
+     **/
+    const { key } = input;
+
+    ContractAssert(
+      typeof key === "string" && key.trim().length,
+      "ERROR_INVALID_STATE_KEY"
+    );
+    ContractAssert(key in state, "ERROR_INVALID_STATE_KEY");
+    return {
+      result: state[key.trim()],
+    };
+  }
+
+  if (input.function === "getPodcastsOf") {
+    /**
+     * @dev return the podcats created by a given
+     * Arweave address
+     *
+     * @param address targeted user address
+     *
+     * @return query result
+     *
+     **/
+    const { address } = input;
+    _validateArweaveAddress(address);
+    const podcasts = state.podcasts.filter(
+      (podcast) => podcast.owner === address
+    );
+
+    return {
+      result: podcasts,
+    };
+  }
+
+  if (input.function === "getRecentUploadsOf") {
+    /**
+     * @dev return the recent uploads by a given Arweave
+     * address
+     *
+     * @param address targeted user address
+     *
+     * @return query result
+     *
+     **/
+    const { address } = input;
+    _validateArweaveAddress(address);
+    const uploads = state.podcasts.map((podcast) => podcast.episodes).flat();
+    const userUploads = uploads.filter(
+      (episode) => episode.uploader === address
+    );
+
+    return {
+      result: userUploads.sort((a, b) => b.uploadedAt - a.uploadedAt),
+    };
   }
 
   // ADMIN FUNCTIONS
@@ -658,8 +741,6 @@ export async function handle(state, action) {
      * @param podcastName corresponding new limitations
      * @param episodename corresponding new limitations
      * @param authorName corresponding new limitations
-     * @param podcastDesc corresponding new limitations
-     * @param episodeDesc corresponding new limitations
      * @param pid corresponding new limitations
      * @param sig a message signed by the caller's public key
      *
@@ -670,11 +751,12 @@ export async function handle(state, action) {
     const podcastName = input.podcastName;
     const episodeName = input.episodeName;
     const authorName = input.authorName;
-    const podcastDesc = input.podcastDesc;
-    const episodeDesc = input.episodeDesc;
     const sig = input.sig;
+    const jwk_n = input.jwk_n;
 
-    await _verifyAdminArSignature(state.admins[0], sig);
+    const caller = await _ownerToAddress(jwk_n);
+    ContractAssert(caller === state.admin, "ERROR_INVALID_CALLER");
+    await _verifyArSignature(jwk_n, sig);
 
     if (podcastName) {
       const minMax = _validateAndReturnLimits(podcastName);
@@ -686,18 +768,6 @@ export async function handle(state, action) {
       const minMax = _validateAndReturnLimits(episodeName);
       EP_NAME_LIMITS.min = minMax[0];
       EP_NAME_LIMITS.max = minMax[1];
-    }
-
-    if (podcastDesc) {
-      const minMax = _validateAndReturnLimits(podcastDesc);
-      POD_DESC_LIMITS.min = minMax[0];
-      POD_DESC_LIMITS.max = minMax[1];
-    }
-
-    if (episodeDesc) {
-      const minMax = _validateAndReturnLimits(episodeDesc);
-      EP_DESC_LIMITS.min = minMax[0];
-      EP_DESC_LIMITS.max = minMax[1];
     }
 
     if (authorName) {
@@ -724,60 +794,16 @@ export async function handle(state, action) {
      *
      **/
     const sig = input.sig;
+    const jwk_n = input.jwk_n;
     const newMessage = input.newMessage;
-    const type = input.type;
 
-    await _verifyAdminArSignature(state.admins[0], sig);
+    const caller = await _ownerToAddress(jwk_n);
+    ContractAssert(caller === state.admin, "ERROR_INVALID_CALLER");
+    await _verifyArSignature(jwk_n, sig);
     _validateStringTypeLen(newMessage, 1, 1e4);
 
-    ContractAssert(
-      ["user_sig_messages", "admin_sig_messages"].includes(type),
-      ERROR_INVALID_SIG_TYPE
-    );
-    state[type].push(newMessage);
-
-    return { state };
-  }
-
-  if (input.function === "modifyStore") {
-    /**
-     * @dev change the Mintbase store contract
-     * address used for episodes tokenization.
-     *
-     * @param jwk_n the public key of the admin
-     * @param sig a message signed by the admin's pub key
-     * @param store the new store smart contract address
-     * @param action modification action: 'add' or 'remove'
-     *
-     * @return state
-     *
-     **/
-
-    const sig = input.sig;
-    const store = input.store;
-    const action = input.action;
-
-    await _verifyAdminArSignature(state.admins[0], sig);
-
-    ContractAssert(
-      ["add", "remove"].includes(action),
-      ERROR_INVALID_MODIFICATION_ACTION
-    );
-    ContractAssert(
-      typeof store === "string" && store.length,
-      ERROR_INVALID_STORE_SYNTAX
-    );
-
-    if (action === "add") {
-      ContractAssert(!stores.includes(store), ERROR_STORE_ALREADY_ADDED);
-      stores.push(store);
-    }
-
-    if (action === "remove") {
-      const storeIndex = stores.findIndex((sc) => sc === store);
-      ContractAssert(storeIndex >= 0, ERROR_STORE_NOT_EXISTING);
-      stores.splice(storeIndex, 1);
-    }
+    state.sig_messages.push(newMessage);
+    state.signatures = [];
 
     return { state };
   }
@@ -794,127 +820,40 @@ export async function handle(state, action) {
      *
      **/
     const sig = input.sig;
+    const jwk_n = input.jwk_n;
 
-    await _verifyAdminArSignature(state.admins[0], sig);
+    const caller = await _ownerToAddress(jwk_n);
+    ContractAssert(caller === state.admin, "ERROR_INVALID_CALLER");
+    await _verifyArSignature(jwk_n, sig);
 
     state.isPaused = !state.isPaused;
 
     return { state };
   }
 
-  if (input.function === "updatePaymentEndpoint") {
-    /**
-     * @dev updating the API endpoint of the
-     * podcast's creation fee handler proxy.
-     *
-     * @param sig a message signed by the admin's pub key
-     * @param endpoint the new proxy endpoint URL
-     *
-     * @return state
-     *
-     **/
-
+  if (input.function === "shardState") {
     const sig = input.sig;
-    const endpoint = input.endpoint;
+    const jwk_n = input.jwk_n;
 
-    await _verifyAdminArSignature(state.admins[0], sig);
+    const caller = await _ownerToAddress(jwk_n);
+    ContractAssert(caller === state.admin, "ERROR_INVALID_CALLER");
+    await _verifyArSignature(jwk_n, sig);
 
-    ContractAssert(
-      endpoint.startsWith("https://"),
-      ERROR_INVALID_ENDPOINT_SYNTAX
-    );
-    state.fees_handler_endpoint = endpoint;
+    state.isSharded = true;
 
     return { state };
   }
 
-  if (input.function === "modifyPaymentTokens") {
-    /**
-     * @dev modify the accepted tokens by the
-     * proxy node that process paid podcast fees validation.
-     * @param sig a message signed by the admin's pub key
-     * @param token the newly accepted token ticker (uppercase)
-     * @param action modification action: 'add' or 'remove'
-     *
-     * @return state
-     *
-     **/
-
-    const sig = input.sig;
-    const token = input.token;
-    const action = input.action;
-
-    await _verifyAdminArSignature(state.admins[0], sig);
-
-    ContractAssert(
-      ["add", "remove"].includes(action),
-      ERROR_INVALID_MODIFICATION_ACTION
+  // PORTING PHASE ONLY
+  if (input.function === "importPodcast") {
+    ContractAssert(!state.isPorted, "ERROR_STATE_ALREADY_PORTED");
+    const req = await EXM.deterministicFetch(
+      `https://arseed.web3infra.dev/nwD5ZlhBCMWIQfkv6OQaiqIHE7jqbBkND1HW3rt9s8E`
     );
-
-    if (action === "add") {
-      ContractAssert(token.length >= 2, ERROR_INVALID_TOKEN_TICKER);
-      ContractAssert(
-        !state.supported_tokens.includes(token),
-        ERROR_TOKEN_ALREADY_ADDED
-      );
-      state.supported_tokens.push(token);
-
-      return { state };
-    }
-
-    if (action === "remove") {
-      const tokenIndex = state.supported_tokens.findIndex(
-        (tkn) => tkn === token
-      );
-      ContractAssert(tokenIndex >= 0, ERROR_TOKEN_NOT_FOUND);
-      state.supported_tokens.splice(tokenIndex, 1);
-
-      return { state };
-    }
-  }
-
-  if (input.function === "modifyPaymentNetworks") {
-    /**
-     * @dev modify the supported blockchain networks supported
-     * by the proxy node that process paid podcast fees validation.
-     * @param sig a message signed by the admin's pub key
-     * @param network the newly accepted network name (lowecase)
-     * @param action modification action: 'add' or 'remove'
-     *
-     * @return state
-     *
-     **/
-    const sig = input.sig;
-    const network = input.network;
-    const action = input.action;
-
-    await _verifyAdminArSignature(state.admins[0], sig);
-
-    ContractAssert(
-      ["add", "remove"].includes(action),
-      ERROR_INVALID_MODIFICATION_ACTION
-    );
-
-    if (action === "add") {
-      ContractAssert(network.length, ERROR_INVALID_NETWORK_NAME);
-      ContractAssert(
-        !state.fees_networks.includes(network),
-        ERROR_NETWORK_ALREADY_ADDED
-      );
-      state.fees_networks.push(network);
-
-      return { state };
-    }
-
-    if (action === "remove") {
-      const networkIndex = state.fees_networks.findIndex(
-        (net) => net === network
-      );
-      ContractAssert(networkIndex >= 0, ERROR_NETWORK_NOT_FOUND);
-      state.fees_networks.splice(networkIndex, 1);
-
-      return { state };
-    }
+    const podcasts = req.asJSON()?.podcasts;
+    state.podcasts = podcasts;
+    state.isPorted = true;
+    return { state };
   }
 
   function _validateArweaveAddress(address) {
@@ -990,7 +929,7 @@ export async function handle(state, action) {
       .map((str) => Number(str));
     ContractAssert(
       Number.isInteger(minMax[0]) && Number.isInteger(minMax[1]),
-      ERROR_LIMITATIONS_NOT_INTEGER
+      ERROR_LIMITATIONS_NOT_INTEGERS
     );
     ContractAssert(minMax[0] <= minMax[1], ERROR_INVALID_LIMITATIONS_ORDER); // ensure the limits orders
     return minMax;
@@ -1002,7 +941,7 @@ export async function handle(state, action) {
         !state.signatures.includes(signature),
         ERROR_SIGNATURE_ALREADY_USED
       );
-      const sigBody = state.user_sig_messages;
+      const sigBody = state.sig_messages;
       const encodedMessage = new TextEncoder().encode(
         `${sigBody[sigBody.length - 1]}${owner}`
       );
@@ -1016,75 +955,32 @@ export async function handle(state, action) {
       );
 
       ContractAssert(isValid, ERROR_INVALID_CALLER_SIGNATURE);
-      
+
       state.signatures.push(signature);
     } catch (error) {
       throw new ContractError(ERROR_INVALID_CALLER_SIGNATURE);
     }
   }
 
-  async function _verifyAdminArSignature(owner, signature) {
+  async function _validatePayment(caller, txid) {
     try {
-      ContractAssert(state.admins.includes(owner), ERROR_INVALID_CALLER);
-      ContractAssert(
-        !admins_signatures.includes(signature),
-        ERROR_SIGNATURE_ALREADY_USED
-      );
-      
-      const sigBody = state.admin_sig_messages;
-      const encodedMessage = new TextEncoder().encode(
-        `${sigBody[sigBody.length - 1]}${owner}`
-      );
-      const typedArraySig = Uint8Array.from(atob(signature), (c) =>
-        c.charCodeAt(0)
-      );
-      const isValid = await SmartWeave.arweave.crypto.verify(
-        owner,
-        encodedMessage,
-        typedArraySig
-      );
-
-      ContractAssert(isValid, ERROR_INVALID_CALLER_SIGNATURE);
-      admins_signatures.push(signature);
-    } catch (error) {
-      throw new ContractError(ERROR_INVALID_CALLER_SIGNATURE);
-    }
-  }
-
-  function _checkTokenId(store, token_id) {
-    ContractAssert(
-      Number.isInteger(token_id) && token_id >= 0,
-      ERROR_INVALID_TOKEN_ID_SYNTAX
-    );
-    const existingTokenizedEpisode = podcasts
-      .map((pod) => pod.episodes)
-      .flat()
-      .find((ep) => ep.store === store && ep.token_id === token_id);
-    ContractAssert(
-      !existingTokenizedEpisode,
-      ERROR_EP_TOKENIZATION_DUPLICATION
-    );
-  }
-
-  async function _validatePayment(master, network, token, txid) {
-    try {
-      ContractAssert(
-        ["evm", "exotic"].includes(master.toLowerCase()),
-        ERROR_INVALID_MASTER_NETWORK
-      );
-      ContractAssert(
-        state.fees_networks.includes(network.toLowerCase()),
-        ERROR_UNSUPPORTED_NETWORK
-      );
-      ContractAssert(
-        state.supported_tokens.includes(token.toUpperCase()),
-        ERROR_UNSUPPORTED_TOKEN
-      );
-      ContractAssert(!state.paid_fees.includes(txid), ERROR_REENTRANCY_FEE);
+      ContractAssert(!state.paid_fees.includes(txid), "ERROR_INVALID_PAYMENT");
       const req = await EXM.deterministicFetch(
-        `${state.fees_handler_endpoint}/${master}/${network}/${token}/${txid}`
+        `${state.ever_molecule_endpoint}/${txid}`
       );
-      ContractAssert(req.asJSON()?.result, ERROR_INVALID_PAYMENT);
+      const tx = req.asJSON();
+      ContractAssert(
+        tx?.tokenSymbol == "AR" &&
+          tx?.action === "transfer" &&
+          !!Number(tx?.amount) &&
+          tx?.to == state.treasury_address &&
+          tx?.from === caller,
+        "ERROR_INVALID_AR_PRICE"
+      );
+      ContractAssert(
+        Number(tx.amount) >= state.podcast_creation_fee,
+        "ERROR_UNDERPAID_FEE"
+      );
       state.paid_fees.push(txid);
     } catch (error) {
       throw new ContractError(ERROR_INVALID_PAYMENT);
@@ -1093,8 +989,8 @@ export async function handle(state, action) {
 
   function _validateLabel(label) {
     if (!label) {
-      return null
-    };
+      return null;
+    }
 
     _validateStringTypeLen(label, 1, 35);
     const existingLabels = podcasts.map((pod) => pod.label && !!pod.label); // only valid labels
@@ -1107,35 +1003,31 @@ export async function handle(state, action) {
     ContractAssert(!state.isPaused, ERROR_CONTRACT_PAUSED);
   }
 
-  async function _getTxObject(txid) {
-    try {
-      _validateArweaveAddress(txid);
-      const req = await EXM.deterministicFetch(`${state.ar_molecule_endpoint}/tx-gql/${txid}`);
-      return req.asJSON();
-    } catch(error) {
-      throw new ContractError(ERROR_MOLECULE_SERVER_ERROR);
-    }
+  function _notSharded() {
+    ContractAssert(!state.isSharded, ERROR_CONTRACT_PAUSED);
   }
 
-  function _getTxMetadata(txObj) {
+  async function _getTxsMetadata(encodedTxs) {
     try {
-      const contentType = (txObj?.tags?.find((tag) => tag?.name?.toLowerCase() == "content-type"))?.value;
-      const size = Number(txObj?.data?.size);
-      ContractAssert(!!size, ERROR_INVALID_DATA_SIZE_TX);
-
-      return {contentType, size};
-    } catch(error) {
-      throw new ContractError(ERROR_PARSING_TX_METADATA);
+      const req = await EXM.deterministicFetch(
+        `${state.mime_molecule_endpoint}/${encodedTxs}`
+      );
+      return req.asJSON();
+    } catch (error) {
+      throw new ContractError(ERROR_MOLECULE_SERVER_ERROR);
     }
   }
 
   async function _ownerToAddress(pubkey) {
     try {
-      const req = await EXM.deterministicFetch(`${state.ar_molecule_endpoint}/ota/${pubkey}`);
-      const address = (req.asJSON())?.address;
+      _validateOwnerSyntax(pubkey);
+      const req = await EXM.deterministicFetch(
+        `${state.ar_molecule_endpoint}/ota/${pubkey}`
+      );
+      const address = req.asJSON()?.address;
       _validateArweaveAddress(address);
       return address;
-    } catch(error) {
+    } catch (error) {
       throw new ContractError(ERROR_MOLECULE_SERVER_ERROR);
     }
   }
