@@ -1,6 +1,6 @@
 {
   "name": "permacast-protocol",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "description": "Specifications and architecture of Permacast protocol",
   "main": "index.js",
