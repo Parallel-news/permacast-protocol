@@ -6,6 +6,7 @@
   "isSharded": false,
   "sig_messages": ["my Arweave PK for Permacast is "],
   "podcast_creation_fee": 1000000,
+  "episode_creation_fee": 13000000000,
   "mime_molecule_endpoint": "https://molecules-exm.herokuapp.com/ar/mime",
   "ar_molecule_endpoint": "http://ar.molecule.sh",
   "ever_molecule_endpoint": "https://molecules-exm.herokuapp.com/ever/everpay/tx",

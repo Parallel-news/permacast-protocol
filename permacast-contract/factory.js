@@ -135,7 +135,7 @@ export async function handle(state, action) {
       _notPaused();
       _notSharded();
       await _verifyArSignature(jwk_n, sig);
-      await _validatePayment(caller, txid);
+      await _validatePayment(caller, txid, "podcast");
       const inputTxsMetadata = await _getTxsMetadata(
         btoa(JSON.stringify([cover, minifiedCover, description]))
       );
@@ -221,6 +221,7 @@ export async function handle(state, action) {
      * @param name episode name
      * @param content episode audio's or video's Arseed TXID
      * @param desc the episode's description (arseed TXID)
+     * @para, txid Everpay fee TXID
      * @param jwk_n the public key of the caller
      * @param sig a message signed by the caller's public key
      *
@@ -231,6 +232,7 @@ export async function handle(state, action) {
     const name = input.name;
     const description = input.desc;
     const content = input.content;
+    const txid = input.txid;
     const jwk_n = input.jwk_n;
     const sig = input.sig;
 
@@ -246,6 +248,8 @@ export async function handle(state, action) {
         podcasts[pidIndex]["maintainers"].includes(caller),
       ERROR_INVALID_CALLER
     );
+
+    await _validatePayment(caller, txid, "episode");
 
     const inputTxsMetadata = await _getTxsMetadata(
       btoa(JSON.stringify([content, description]))
@@ -273,6 +277,7 @@ export async function handle(state, action) {
       uploader: caller,
       uploadedAt: EXM.getDate().getTime(),
       isVisible: true,
+      txid: txid,
     });
 
     return { state };
@@ -445,7 +450,7 @@ export async function handle(state, action) {
 
     if (cover) {
       _validateArweaveAddress(cover);
-      const coverTxMetadata =  await _getTxsMetadata(
+      const coverTxMetadata = await _getTxsMetadata(
         btoa(JSON.stringify([cover]))
       );
       ContractAssert(
@@ -457,7 +462,7 @@ export async function handle(state, action) {
 
     if (minifiedCover) {
       _validateArweaveAddress(minifiedCover);
-      const coverTxMetadata =  await _getTxsMetadata(
+      const coverTxMetadata = await _getTxsMetadata(
         btoa(JSON.stringify([minifiedCover]))
       );
       ContractAssert(
@@ -741,6 +746,8 @@ export async function handle(state, action) {
      * @param podcastName corresponding new limitations
      * @param episodename corresponding new limitations
      * @param authorName corresponding new limitations
+     * @param podcastCreationFee corresponding new limitations
+     * @param episodeCreationFee corresponding new limitations
      * @param pid corresponding new limitations
      * @param sig a message signed by the caller's public key
      *
@@ -751,6 +758,8 @@ export async function handle(state, action) {
     const podcastName = input.podcastName;
     const episodeName = input.episodeName;
     const authorName = input.authorName;
+    const podcastCreationFee = input.podcastCreationFee;
+    const episodeCreationFee = input.episodeCreationFee;
     const sig = input.sig;
     const jwk_n = input.jwk_n;
 
@@ -774,6 +783,24 @@ export async function handle(state, action) {
       const minMax = _validateAndReturnLimits(authorName);
       AUTHOR_NAME_LIMITS.min = minMax[0];
       AUTHOR_NAME_LIMITS.max = minMax[1];
+    }
+
+    if (podcastCreationFee) {
+      ContractAssert(
+        typeof podcastCreationFee === "number" &&
+          Number.isInteger(podcastCreationFee) &&
+          podcastCreationFee > 1e-12
+      );
+      state.podcast_creation_fee = podcastCreationFee;
+    }
+
+    if (episodeCreationFee) {
+      ContractAssert(
+        typeof episodeCreationFee === "number" &&
+          Number.isInteger(episodeCreationFee) &&
+          episodeCreationFee > 1e-12
+      );
+      state.episode_creation_fee = episodeCreationFee;
     }
 
     return { state };
@@ -962,7 +989,7 @@ export async function handle(state, action) {
     }
   }
 
-  async function _validatePayment(caller, txid) {
+  async function _validatePayment(caller, txid, type) {
     try {
       ContractAssert(!state.paid_fees.includes(txid), "ERROR_INVALID_PAYMENT");
       const req = await EXM.deterministicFetch(
@@ -977,10 +1004,18 @@ export async function handle(state, action) {
           tx?.from === caller,
         "ERROR_INVALID_AR_PRICE"
       );
-      ContractAssert(
-        Number(tx.amount) >= state.podcast_creation_fee,
-        "ERROR_UNDERPAID_FEE"
-      );
+
+      if (type === "podcast") {
+        ContractAssert(
+          Number(tx.amount) >= state.podcast_creation_fee,
+          "ERROR_UNDERPAID_FEE"
+        );
+      } else {
+        ContractAssert(
+          Number(tx.amount) >= state.episode_creation_fee,
+          "ERROR_UNDERPAID_FEE"
+        );
+      }
       state.paid_fees.push(txid);
     } catch (error) {
       throw new ContractError(ERROR_INVALID_PAYMENT);
