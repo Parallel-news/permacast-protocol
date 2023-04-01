@@ -188,7 +188,6 @@ export async function handle(state, action) {
         pid: pid,
         label: validatedLabel,
         createdAt: EXM.getDate().getTime(),
-        index: _getPodcastIndex(),
         owner: caller,
         podcastName: name,
         author: author,
@@ -875,7 +874,7 @@ export async function handle(state, action) {
   if (input.function === "importPodcast") {
     ContractAssert(!state.isPorted, "ERROR_STATE_ALREADY_PORTED");
     const req = await EXM.deterministicFetch(
-      `https://arseed.web3infra.dev/nwD5ZlhBCMWIQfkv6OQaiqIHE7jqbBkND1HW3rt9s8E`
+      `https://arseed.web3infra.dev/goYBf0snGS2qZe0d6f7L19pLF_a2RmjYlbuWLvWmJVo`
     );
     const podcasts = req.asJSON()?.podcasts;
     state.podcasts = podcasts;
@@ -895,14 +894,6 @@ export async function handle(state, action) {
       typeof owner === "string" && owner?.length === 683,
       ERROR_INVALID_JWK_N_SYNTAX
     );
-  }
-
-  function _getPodcastIndex() {
-    if (podcasts.length === 0) {
-      return 0;
-    }
-
-    return podcasts.length;
   }
 
   function _validateStringTypeLen(str, minLen, maxLen) {
