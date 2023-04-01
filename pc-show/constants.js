@@ -1,2 +1,2 @@
-export const PERMACAST_CONTRACT_ID = `pnx_zMOSYqOhgsZF4HIWmEVbsAw4FnoClEUymRN3jeM`;
-export const PERMACAST_BASE_URL = `https://legacy.permacast.dev/#/podcasts`;
+export const PERMACAST_CONTRACT_ID = `zVgwbAUeYaYeZiRnv1Lqg4yLELC7OXsPDMhdfmQHTG4`;
+export const PERMACAST_BASE_URL = `https://permacast.app/podcast`;
