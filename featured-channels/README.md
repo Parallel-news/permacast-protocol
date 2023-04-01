@@ -2,7 +2,7 @@
 Feature your Permacast channel on the homepage, pay as you go!
 
 ## Contract
-- [H6dGlpvdR-FaS4ZawiwGWzpkf2RWrpdLig80eVFWVwI](https://api.exm.dev/read/H6dGlpvdR-FaS4ZawiwGWzpkf2RWrpdLig80eVFWVwI)
+- [zyeTjKzVgKS6iu6g7JIeoXwOIBgpu_7LW8pRSjtKzPI](https://api.exm.dev/read/zyeTjKzVgKS6iu6g7JIeoXwOIBgpu_7LW8pRSjtKzPI)
 
 ### write operation example
 
