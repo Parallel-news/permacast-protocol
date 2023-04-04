@@ -21,7 +21,14 @@ export async function handle(state, action) {
         podcasts[pidIndex].maintainers.includes(caller_address),
       "ERROR_INVALID_CALLER"
     );
-    const expectedFee = period * state.daily_winston_fee;
+    ContractAssert(
+      podcasts[pidIndex].episodes.length,
+      "ERROR_CANNOT_FEATURE_EMPTY_CHANNELS"
+    );
+    const expectedFee =
+      period < 2
+        ? state.base_fee
+        : period * state.daily_winston_fee + state.base_fee;
     await _validatePayment(caller, payment_txid, expectedFee);
 
     const creationTimestamp = EXM.getDate().getTime();
