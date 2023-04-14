@@ -37,5 +37,9 @@ Permacast's state (testnet and mainnet) is relatively related to the technical p
 | Gasless Contract Interaction 	|	❌ | ✔️	|
 | Interaction Success Guarantee (blockchain network level) | ❌ | ✔️ |
 
+### Bloodstone Mainnet V2
+- Contract address: [zVgwbAUeYaYeZiRnv1Lqg4yLELC7OXsPDMhdfmQHTG4](https://api.exm.dev/read/zVgwbAUeYaYeZiRnv1Lqg4yLELC7OXsPDMhdfmQHTG4)
+- soft-fork Blockheight: `#1149699`
+
 ## License
 This protocol is licensed under the [MIT License](./LICENSE)
