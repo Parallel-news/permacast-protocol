@@ -434,7 +434,7 @@ export async function handle(state, action) {
     }
 
     if (author) {
-      _validateStringTypeLe(
+      _validateStringTypeLen(
         author,
         AUTHOR_NAME_LIMITS.min,
         AUTHOR_NAME_LIMITS.max
