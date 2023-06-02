@@ -220,6 +220,7 @@ export async function handle(state, action) {
      * @param name episode name
      * @param content episode audio's or video's Arseed TXID
      * @param desc the episode's description (arseed TXID)
+     * @param thumbnail an optional thumbnail property for the episode
      * @para, txid Everpay fee TXID
      * @param jwk_n the public key of the caller
      * @param sig a message signed by the caller's public key
@@ -234,6 +235,7 @@ export async function handle(state, action) {
     const txid = input.txid;
     const jwk_n = input.jwk_n;
     const sig = input.sig;
+    const thumbnail = input.thumbnail;
 
     _notPaused();
     await _verifyArSignature(jwk_n, sig);
@@ -250,9 +252,11 @@ export async function handle(state, action) {
 
     await _validatePayment(caller, txid, "episode");
 
-    const inputTxsMetadata = await _getTxsMetadata(
+    const inputTxsMetadata = thumbnail ? await _getTxsMetadata(
+      btoa(JSON.stringify([content, description, thumbnail]))
+    ) : await _getTxsMetadata(
       btoa(JSON.stringify([content, description]))
-    );
+    )
 
     ContractAssert(
       inputTxsMetadata?.[description]?.mime?.startsWith(`text/markdown`),
@@ -264,6 +268,11 @@ export async function handle(state, action) {
       ERROR_MIME_TYPE
     );
 
+    thumbnail ?   ContractAssert(
+      inputTxsMetadata?.[thumbnail]?.mime?.startsWith(`image/`),
+      ERROR_MIME_TYPE
+    ) : void 0;
+
     _validateStringTypeLen(name, EP_NAME_LIMITS.min, EP_NAME_LIMITS.max);
     _validateStringTypeLen(content, 43, 43);
 
@@ -272,6 +281,7 @@ export async function handle(state, action) {
       episodeName: name,
       description: description,
       contentTx: content,
+      thumbnail: thumbnail ? thumbnail : null,
       type: inputTxsMetadata?.[content]?.mime,
       uploader: caller,
       uploadedAt: EXM.getDate().getTime(),
@@ -281,6 +291,100 @@ export async function handle(state, action) {
 
     return { state };
   }
+
+
+   if (input.function === "addBatchEpisode") {
+     /**
+      * @dev create an episode object and append
+      *  it to a podcast object's episodes array
+      *  Maintainers and Podcast owner can invoke
+      *  this function.
+      *
+      * @param pid podcast ID (pid). 43 chars string
+      * @param name episode name
+      * @param content episode audio's or video's Arseed TXID
+      * @param desc the episode's description (arseed TXID)
+      * @param thumbnail an optional thumbnail property for the episode
+      * @para, txid Everpay fee TXID
+      * @param jwk_n the public key of the caller
+      * @param sig a message signed by the caller's public key
+      *
+      * @return state
+      **/
+
+     const pid = input.pid;
+     const episodes = input.episodes;
+     const txid = input.txid;
+     const jwk_n = input.jwk_n;
+     const sig = input.sig;
+
+     _notPaused();
+     await _verifyArSignature(jwk_n, sig);
+     const caller = await _ownerToAddress(jwk_n);
+     const pidIndex = _getAndValidatePidIndex(pid);
+
+     ContractAssert(
+       podcasts[pidIndex]["owner"] === caller ||
+         podcasts[pidIndex]["maintainers"].includes(caller),
+       ERROR_INVALID_CALLER
+     );
+
+     ContractAssert(
+       episodes.length && Array.isArray(episodes) && episodes.length <= 100,
+       "ERROR_INVALID_EPISODES_INPUT"
+     );
+
+     await _validatePayment(caller, txid, "episode", episodes.length);
+
+     for (const episode of episodes) {
+       const name = episode.name;
+       const description = episode.desc;
+       const content = episode.content;
+       const thumbnail = episode.thumbnail;
+
+       const inputTxsMetadata = thumbnail
+         ? await _getTxsMetadata(
+             btoa(JSON.stringify([content, description, thumbnail]))
+           )
+         : await _getTxsMetadata(btoa(JSON.stringify([content, description])));
+
+       ContractAssert(
+         inputTxsMetadata?.[description]?.mime?.startsWith(`text/markdown`),
+         ERROR_MIME_TYPE
+       );
+       ContractAssert(
+         inputTxsMetadata?.[content]?.mime?.startsWith(`audio/`) ||
+           inputTxsMetadata?.[content]?.mime?.startsWith(`video/`),
+         ERROR_MIME_TYPE
+       );
+
+       thumbnail
+         ? ContractAssert(
+             inputTxsMetadata?.[thumbnail]?.mime?.startsWith(`image/`),
+             ERROR_MIME_TYPE
+           )
+         : void 0;
+
+       _validateStringTypeLen(name, EP_NAME_LIMITS.min, EP_NAME_LIMITS.max);
+       _validateStringTypeLen(content, 43, 43);
+
+       podcasts[pidIndex]["episodes"].push({
+         eid: SmartWeave.transaction.id,
+         episodeName: name,
+         description: description,
+         contentTx: content,
+         thumbnail: thumbnail ? thumbnail : null,
+         type: inputTxsMetadata?.[content]?.mime,
+         uploader: caller,
+         uploadedAt: EXM.getDate().getTime(),
+         isVisible: true,
+         txid: txid,
+       });
+     }
+
+     return { state };
+   }
+
 
   if (input.function === "addMaintainers") {
     /**
@@ -513,6 +617,7 @@ export async function handle(state, action) {
      * @param eid episode's EID
      * @param name episode's name (new value)
      * @param desc episode's description (new value - Arseed TXID)
+     * @param thumbnail episode's thumbnail (new value - Arseed TXID)
      * @param isVisible episode's visibility (new value)
      * @param jwk_n the public key of the caller
      * @param sig a message signed by the caller's public key
@@ -526,6 +631,7 @@ export async function handle(state, action) {
     const isVisible = input.isVisible;
     const jwk_n = input.jwk_n;
     const sig = input.sig;
+    const thumbnail = input.thumbnail;
 
     _notPaused();
     await _verifyArSignature(jwk_n, sig);
@@ -556,6 +662,18 @@ export async function handle(state, action) {
         ERROR_MIME_TYPE
       );
       episode["description"] = description;
+    }
+
+    if (thumbnail) {
+      const descTxMetadata = await _getTxsMetadata(
+        btoa(JSON.stringify([thumbnail]))
+      );
+
+      ContractAssert(
+        descTxMetadata?.[thumbnail]?.mime?.startsWith(`image/`),
+        ERROR_MIME_TYPE
+      );
+      episode["thumbnail"] = thumbnail;
     }
 
     if (isVisible) {
@@ -980,7 +1098,7 @@ export async function handle(state, action) {
     }
   }
 
-  async function _validatePayment(caller, txid, type) {
+  async function _validatePayment(caller, txid, type, episodes_count) {
     try {
       ContractAssert(!state.paid_fees.includes(txid), "ERROR_INVALID_PAYMENT");
       const req = await EXM.deterministicFetch(
@@ -1002,8 +1120,9 @@ export async function handle(state, action) {
           "ERROR_UNDERPAID_FEE"
         );
       } else {
+         const count = episodes_count ? episodes_count : 1;
         ContractAssert(
-          Number(tx.amount) >= state.episode_creation_fee,
+          Number(tx.amount) >= state.episode_creation_fee * count,
           "ERROR_UNDERPAID_FEE"
         );
       }
@@ -1038,6 +1157,7 @@ export async function handle(state, action) {
       const req = await EXM.deterministicFetch(
         `${state.mime_molecule_endpoint}/${encodedTxs}`
       );
+
       return req.asJSON();
     } catch (error) {
       throw new ContractError(ERROR_MOLECULE_SERVER_ERROR);
