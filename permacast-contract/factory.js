@@ -597,10 +597,10 @@ export async function handle(state, action) {
 
     if (isVisible) {
       ContractAssert(
-        [true, false].includes(isVisible),
+        ["yes", "no"].includes(isVisible),
         ERROR_INVALID_PRIMITIVE_TYPE
       );
-      podcast["isVisible"] = isVisible;
+      podcast["isVisible"] = isVisible === "yes" ? true : false;
     }
 
     if (label) {
