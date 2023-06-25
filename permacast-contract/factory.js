@@ -678,10 +678,10 @@ export async function handle(state, action) {
 
     if (isVisible) {
       ContractAssert(
-        [true, false].includes(isVisible),
+        ["yes", "no"].includes(isVisible),
         ERROR_INVALID_PRIMITIVE_TYPE
       );
-      episode["isVisible"] = isVisible;
+      episode["isVisible"] = isVisible === "yes" ? true : false;
     }
 
     return { state };
@@ -1104,6 +1104,7 @@ export async function handle(state, action) {
       const req = await EXM.deterministicFetch(
         `${state.ever_molecule_endpoint}/${txid}`
       );
+
       const tx = req.asJSON();
       ContractAssert(
         tx?.tokenSymbol == "AR" &&
