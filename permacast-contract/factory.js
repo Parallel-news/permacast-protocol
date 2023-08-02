@@ -989,14 +989,16 @@ export async function handle(state, action) {
   }
 
   // PORTING PHASE ONLY
-  if (input.function === "importPodcast") {
-    ContractAssert(!state.isPorted, "ERROR_STATE_ALREADY_PORTED");
-    const req = await EXM.deterministicFetch(
-      `https://arseed.web3infra.dev/goYBf0snGS2qZe0d6f7L19pLF_a2RmjYlbuWLvWmJVo`
-    );
-    const podcasts = req.asJSON()?.podcasts;
-    state.podcasts = podcasts;
-    state.isPorted = true;
+  if (input.function === "importState") {
+    ContractAssert(!state.isImported, "ERROR_STATE_IMPORTED");
+    const importedState = (
+      await EXM.deterministicFetch(
+        `https://arweave.net/umgZPnh_b_AfHHk9x4eCcFGy6QF0OYd9_7oe5ki3Afs`,
+      )
+    ).asJSON();
+    importedState.isImported = true;
+    state = importedState;
+
     return { state };
   }
 
